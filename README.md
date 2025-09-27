@@ -7,6 +7,6 @@
 
 <div align="center">
   <a target="_blank" href="https://github.com/grei-ufc" style="background:none">
-    <img src="https://github.com/grei-ufc/tsdq-dataview-opentes/blob/main/Grei2.png?raw=true" alt="Made by Astral">
+    <img src="[https://github.com/grei-ufc/tsdq-dataview-opentes/blob/main/Grei2.png?raw=true](https://github.com/grei-ufc/tsdq-dataview-opentes/blob/main/imagens/Grei2.png?raw=true)" alt="Made by Astral">
   </a>
 </div>
