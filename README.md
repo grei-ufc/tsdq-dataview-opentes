@@ -12,7 +12,7 @@ Olá usuário! Aqui você encontrará os passos para poder rodar a simulação d
 - Git instalado;
 - Internet.
     
-## Instalação
+## Instalação do ``uv``
 1. Se você utiliza o Git Bash (recomendado para quem usa VSCode + Git Bash):
 
 ```bash
