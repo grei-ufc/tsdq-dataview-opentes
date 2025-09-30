@@ -1,4 +1,4 @@
-## TSDQ
+## #TSDQ
 
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Grei](https://img.shields.io/badge/-GREI-Black?logo=INSPIRE&logoColor=blue&color=42b85a&labelColor=white&style=flat)](https://www.linkedin.com/company/grei-ufc/?originalSubdomain=br)
@@ -60,6 +60,8 @@ Para conferir se realmente deu certo basta escrever:
 ```
 
 Isso pode demorar um pouco então espere até a próxima chamada de código... seja paciente! Por fim, agora é só rodar a simulação através do streamlit que é a interface que mostrará os dados do projeto.
+
+> **OBS:** Se você possui antivírus no seu computador é normal que ele vasculhe o programa ou até mesmo o Firewall pode solicitar permissão para que o código rode. Então não se preocupe com vírus!
 
 **6.** Rode a simulação.
 
