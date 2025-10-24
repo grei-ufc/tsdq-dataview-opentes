@@ -40,12 +40,11 @@ st.sidebar.markdown("""
 # MAPEAMENTO DE ARQUIVOS
 # ========================
 mapa_arquivos = {
-    "Tensão Subestação": "Equivalente_Mon_tensaosub_1*.csv",
-    "Tensão Carga D": "Equivalente_Mon_tensaocargad_1*.csv",
-    "Potência Subestação": "Equivalente_Mon_potenciasub_1*.csv",
-    "Potência Carga D": "Equivalente_Mon_potenciacargad_1*.csv",
+    "Tensão Subestação": "Exemplos/Equivalente_Mon_tensaosub_1*.csv",
+    "Tensão Carga D": "Exemplos/Equivalente_Mon_tensaocargad_1*.csv",
+    "Potência Subestação": "Exemplos/Equivalente_Mon_potenciasub_1*.csv",
+    "Potência Carga D": "Exemplos/Equivalente_Mon_potenciacargad_1*.csv",
 }
-
 # ========================
 # HELPERS
 # ========================
