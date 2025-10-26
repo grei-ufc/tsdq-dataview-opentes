@@ -5,6 +5,7 @@ import glob
 import os
 import re
 
+
 st.set_page_config(page_title="Simulação Daily.dss", layout="wide")
 
 # ========================
@@ -20,6 +21,19 @@ obtidos a partir dos monitores do arquivo `Daily.dss`.
 # ========================
 # MENU LATERAL
 # ========================
+
+st.sidebar.markdown(
+    """
+    <div align="center">
+      <a target="_blank" href="https://github.com/grei-ufc" style="background:none">
+        <img src="https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Grei2.png" width="200">
+      </a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
 st.sidebar.header("⚙️ Configurações")
 
 tipo_variavel = st.sidebar.radio("Escolha o tipo de variável:", ["Tensão", "Potência"])
@@ -40,11 +54,12 @@ st.sidebar.markdown("""
 # MAPEAMENTO DE ARQUIVOS
 # ========================
 mapa_arquivos = {
-    "Tensão Subestação": "Exemplos/Equivalente_Mon_tensaosub_1*.csv",
-    "Tensão Carga D": "Exemplos/Equivalente_Mon_tensaocargad_1*.csv",
-    "Potência Subestação": "Exemplos/Equivalente_Mon_potenciasub_1*.csv",
-    "Potência Carga D": "Exemplos/Equivalente_Mon_potenciacargad_1*.csv",
+    "Tensão Subestação": "Exemplos/Daily/Equivalente_Mon_tensaosub_1*.csv",
+    "Tensão Carga D": "Exemplos/Daily/Equivalente_Mon_tensaocargad_1*.csv",
+    "Potência Subestação": "Exemplos/Daily/Equivalente_Mon_potenciasub_1*.csv",
+    "Potência Carga D": "Exemplos/Daily/Equivalente_Mon_potenciacargad_1*.csv",
 }
+
 # ========================
 # HELPERS
 # ========================
@@ -167,3 +182,4 @@ elif tipo_variavel == "Potência":
         carregar_e_plotar("Potência Subestação", mapa_arquivos["Potência Subestação"])
     with tab2:
         carregar_e_plotar("Potência Carga D", mapa_arquivos["Potência Carga D"])
+
