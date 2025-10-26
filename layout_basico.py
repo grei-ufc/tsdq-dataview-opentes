@@ -124,16 +124,11 @@ def carregar_e_plotar(nome_monitor, padrao_arquivo):
     df.columns = sanitize_columns(df.columns)
 
     # Identificar eixo X (hora)
-    if "hour" in df.columns:
-        eixo_x = "hour"
-    elif "Time" in df.columns:
-        eixo_x = "Time"
-    else:
-        eixo_x = df.columns[0]
-
+    eixo_x = next((c for c in df.columns if c.lower() in ["hour", "time"]), df.columns[0])
     colunas_y = [c for c in df.columns if c != eixo_x]
 
-    st.subheader(f" {nome_monitor}")
+    # --- Gráfico do canal selecionado ---
+    st.subheader(f"{nome_monitor}")
     canal = st.selectbox(f"Selecione o canal para {nome_monitor}:", colunas_y, key=f"single_{nome_monitor}")
 
     fig = px.line(df, x=eixo_x, y=canal, title=f"{nome_monitor} - {canal}", markers=True)
@@ -143,28 +138,35 @@ def carregar_e_plotar(nome_monitor, padrao_arquivo):
     with st.expander("🔍 Ver tabela de dados"):
         st.dataframe(df)
 
-    # --- novo gráfico com as 3 fases (se houver) ---
-    triplet = find_phase_triplet(df.columns)
-    if triplet:
-        # assegurar que sejam apresentadas apenas as três fases corretas (na ordem 1,2,3)
-        # ordenar para 1,2,3 conforme sufixo
-        def sort_key(name):
-            m = re.search(r"([_\.]?)(1|2|3)$", name)
-            if m:
-                return int(m.group(2))
-            # tentar último caractere como fallback
-            try:
-                return int(name[-1])
-            except:
-                return 0
-        triplet_sorted = sorted(triplet, key=sort_key)
+    # --- Detectar grupo de variáveis ---
+    if canal.startswith(("V", "v")):
+        grupo = [c for c in df.columns if re.match(r"V\d", c)]
+        titulo = "Tensões (V1–V4)"
+        ylabel = "Tensão (V)"
+    elif canal.startswith(("I", "i")):
+        grupo = [c for c in df.columns if re.match(r"I\d", c)]
+        titulo = "Correntes (I1–I4)"
+        ylabel = "Corrente (A)"
+    elif canal.startswith(("P", "p")):
+        grupo = [c for c in df.columns if c.startswith("P") and "kW" in c]
+        titulo = "Potências Ativas (kW)"
+        ylabel = "Potência Ativa (kW)"
+    elif canal.startswith(("Q", "q")):
+        grupo = [c for c in df.columns if c.startswith("Q") and "kvar" in c]
+        titulo = "Potências Reativas (kvar)"
+        ylabel = "Potência Reativa (kvar)"
+    else:
+        st.info("Tipo de variável não identificado.")
+        return
 
-        st.markdown("####  Gráfico das 3 fases")
-        fig2 = px.line(df, x=eixo_x, y=triplet_sorted, title=f"{nome_monitor} - fases ({', '.join(triplet_sorted)})", markers=True)
-        fig2.update_layout(xaxis_title="Hora", yaxis_title="Valor", template="plotly_white")
+    grupo = sorted(grupo, key=lambda x: int(re.search(r"\d+", x).group(0))) if grupo else []
+
+    if grupo:
+        fig2 = px.line(df, x=eixo_x, y=grupo, title=f"{nome_monitor} - {titulo}", markers=True)
+        fig2.update_layout(xaxis_title="Hora", yaxis_title=ylabel, template="plotly_white")
         st.plotly_chart(fig2, use_container_width=True)
     else:
-        st.info("Não foi possível identificar automaticamente as 3 colunas de fase (1,2,3) para este monitor.")
+        st.info(f"Não foi possível identificar o grupo completo de {titulo}.")
 
 # ========================
 # EXIBIÇÃO DE ABAS DEPENDENDO DA ESCOLHA
