@@ -26,7 +26,7 @@ st.sidebar.markdown(
     """
     <div align="center">
       <a target="_blank" href="https://github.com/grei-ufc" style="background:none">
-        <img src="https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Grei2.png" width="200">
+        <img src="https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Grei2.png" width="100">
       </a>
     </div>
     """,
