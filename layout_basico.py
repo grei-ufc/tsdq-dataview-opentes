@@ -36,7 +36,6 @@ st.sidebar.markdown(
 
 st.sidebar.header("⚙️ Configurações")
 
-tipo_variavel = st.sidebar.radio("Escolha o tipo de variável:", ["Tensão", "Potência"])
 
 # ========================
 # BADGES E LOGO
@@ -53,6 +52,15 @@ st.sidebar.markdown("""
 # ========================
 # MAPEAMENTO DE ARQUIVOS
 # ========================
+
+st.subheader("Seleção de tipo de variável")
+tipo_variavel = st.radio(
+    "Escolha o tipo de variável:",
+    ["Tensão, corrente e ângulo", "Potência ativa e reativa"],
+    horizontal=True
+)
+st.divider()
+
 mapa_arquivos = {
     "Tensão Subestação": "Exemplos/Daily/Equivalente_Mon_tensaosub_1*.csv",
     "Tensão Carga D": "Exemplos/Daily/Equivalente_Mon_tensaocargad_1*.csv",
@@ -171,14 +179,14 @@ def carregar_e_plotar(nome_monitor, padrao_arquivo):
 # ========================
 # EXIBIÇÃO DE ABAS DEPENDENDO DA ESCOLHA
 # ========================
-if tipo_variavel == "Tensão":
+if tipo_variavel == "Tensão, corrente e ângulo":
     tab1, tab2 = st.tabs(["Tensão Subestação", "Tensão Carga D"])
     with tab1:
         carregar_e_plotar("Tensão Subestação", mapa_arquivos["Tensão Subestação"])
     with tab2:
         carregar_e_plotar("Tensão Carga D", mapa_arquivos["Tensão Carga D"])
 
-elif tipo_variavel == "Potência":
+elif tipo_variavel == "Potência ativa e reativa":
     tab1, tab2 = st.tabs(["Potência Subestação", "Potência Carga D"])
     with tab1:
         carregar_e_plotar("Potência Subestação", mapa_arquivos["Potência Subestação"])
