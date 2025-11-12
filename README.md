@@ -66,17 +66,12 @@ Isso pode demorar um pouco então espere até a próxima chamada de código... s
 **6.** Rode a simulação.
 
 ```bash
-  uv run streamlit run demo_cigree.py
-```
-ou 
-
-```bash
-  uv run streamlit run demo_1.py
+  tsdq
 ```
 
 **7.** Pare a simulação.
 
-Basta apertar o comando Ctrl + C no próprio Git Bash.
+Basta apertar o comando Ctrl + C.
 
 <div align="center">
   <a target="_blank" href="https://github.com/grei-ufc" style="background:none">
