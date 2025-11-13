@@ -18,13 +18,12 @@ with col_logo:
         """
         <div align="center">
         <a target="_blank" href="https://github.com/grei-ufc" style="background:none">
-            <img src="https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Grei2.png" width="100">
+            <img src="https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Ilustra%C3%A7%C3%A3o%20fontes%20e%20transmissao.png" width="150">
         </a>
         </div>
         """,
         unsafe_allow_html=True
     )
-
 with col_titulo:
     st.title("OpenTES - TSDQ")
 
@@ -52,8 +51,7 @@ st.markdown("""
 # DESCRIÇÃO
 # ========================
 st.markdown("""
-Painel interativo para visualização dos resultados de **tensão** e **potência**
-obtidos a partir dos monitores do arquivo `Daily.dss`.
+Painel interativo para visualização dos resultados obtidos a partir dos monitores do arquivo `Daily.dss`.
 """)
 
 # ========================
