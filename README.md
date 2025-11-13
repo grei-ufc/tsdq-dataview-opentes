@@ -1,13 +1,48 @@
-## #TSDQ
+## TSDQ
 
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-[![Grei](https://img.shields.io/badge/-GREI-Black?logo=INSPIRE&logoColor=blue&color=42b85a&labelColor=white&style=flat)](https://www.linkedin.com/company/grei-ufc/?originalSubdomain=br)
-[![image](https://img.shields.io/badge/-Python%20Version%20|%203.12.11-42b85a?logo=Python&logoColor=fbec41&color=42b85a&labelColor=grey&style=flat)](https://www.python.org/downloads/release/python-31112/)
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.com/channels/1415180099644297368/1415431164717564065)
+<div align="center">
 
-Olá usuário! Aqui você encontrará os passos para poder rodar a simulação da qualidade de dados de energia no seu computador!
+<img align='right' src="https://github-readme-stats.vercel.app/api?username=betomsales&show_icons=true&title_color=2E86AB&text_color=A23B72&icon_color=F18F01&bg_color=F7F7F7&hide_border=true&cache_seconds=2300" alt="Estatísticas do GitHub" width="400">
 
-Antes de mais nada se você é novo por aqui, seja bem-vindo(a)! Para uma melhor compreensão de como realizar uma simulação local (no seu computador) de um repositório (arquivo no GitHub) basta entender que você irá fazer uma cópia desse arquivo (clonar) na sua máquina. Além disso, essa cópia será realizada através de códigos, assim como criar arquivos (documentos) na área de trabalho. Não precisa de desesperar, basta seguir os passos abaixo! **;D** 
+### 👋 Olá, meu nome é Beto!
+
+<img src="https://img.shields.io/static/v1?label=Overview&message=Beto&color=2E86AB&style=for-the-badge&logo=GitHub&labelColor=F7F7F7&logoColor=2E86AB" alt="GitHub Overview">
+
+</div>
+
+---
+
+<p align="justify">
+Sou bolsista do <strong>Grupo de Redes Elétricas Inteligentes (GREI)</strong> da UFC - Fortaleza, 
+onde atuo no time de <strong>Qualidade de Energia</strong>. Minha pesquisa envolve análise de 
+sistemas elétricos, simulações com OpenDSS e desenvolvimento de ferramentas para monitoramento 
+e melhoria da qualidade de energia.
+</p>
+
+---
+
+<div align="center">
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![OpenDSS](https://img.shields.io/badge/OpenDSS-008000?style=for-the-badge&logo=lightning&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white)
+![Plotly](https://img.shields.io/badge/Plotly-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)
+
+![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)
+![VS Code](https://img.shields.io/badge/VS_Code-007ACC?style=for-the-badge&logo=visual-studio-code&logoColor=white)
+
+</div>
+
+---
+
+Aqui você encontrará os passos para poder rodar a simulação da qualidade de dados de energia no seu computador!
+
+Antes de mais nada se você é novo por aqui, seja bem-vindo(a)! Para uma melhor compreensão de como realizar uma simulação local (no seu computador) de um repositório (arquivo no GitHub) basta entender que você irá fazer uma cópia desse arquivo (clonar) na sua máquina. Além disso, essa cópia será realizada através de comandos, assim como criar arquivos na área de trabalho. Não precisa de desesperar, basta seguir os passos abaixo! **;D** 
+
+---
+
 ### REQUISITOS INICIAIS
 - VSCode ou Git instaldado;
 - Conta no GitHub;
