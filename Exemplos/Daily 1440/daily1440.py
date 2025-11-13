@@ -69,10 +69,10 @@ st.divider()
 # MAPEAMENTO DE ARQUIVOS
 # ========================
 mapa_arquivos = {
-    "Tensão Subestação": "Exemplos/Daily Harmonic/Equivalente_Mon_tensaosub_1*.csv",
-    "Tensão Carga D": "Exemplos/Daily Harmonic/Equivalente_Mon_tensaocargad_1*.csv",
-    "Potência Subestação": "Exemplos/Daily Harmonic/Equivalente_Mon_potenciasub_1*.csv",
-    "Potência Carga D": "Exemplos/Daily Harmonic/Equivalente_Mon_potenciacargad_1*.csv",
+    "Tensão Subestação": "Exemplos/Daily 1440/Equivalente_Mon_tensaosub_1*.csv",
+    "Tensão Carga D": "Exemplos/Daily 1440/Equivalente_Mon_tensaocargad_1*.csv",
+    "Potência Subestação": "Exemplos/Daily 1440/Equivalente_Mon_potenciasub_1*.csv",
+    "Potência Carga D": "Exemplos/Daily 1440/Equivalente_Mon_potenciacargad_1*.csv",
 }
 
 # ========================
