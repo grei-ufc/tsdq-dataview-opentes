@@ -1,19 +1,11 @@
 ## TSDQ
 
-<div align="center">
 
-<img align='right' src="https://github-readme-stats.vercel.app/api?username=betomsales&show_icons=true&title_color=2E86AB&text_color=A23B72&icon_color=F18F01&bg_color=F7F7F7&hide_border=true&cache_seconds=2300" alt="Estatísticas do GitHub" width="400">
-
-### 👋 Olá, meu nome é Beto!
-
-<img src="https://img.shields.io/static/v1?label=Overview&message=Beto&color=2E86AB&style=for-the-badge&logo=GitHub&labelColor=F7F7F7&logoColor=2E86AB" alt="GitHub Overview">
-
-</div>
 
 ---
 
 <p align="justify">
-Sou bolsista do <strong>Grupo de Redes Elétricas Inteligentes (GREI)</strong> da UFC - Fortaleza, 
+Olá usuário, me chamo Beto e sou bolsista do <strong>Grupo de Redes Elétricas Inteligentes (GREI)</strong> da UFC - Fortaleza, 
 onde atuo no time de <strong>Qualidade de Energia</strong>. Minha pesquisa envolve análise de 
 sistemas elétricos, simulações com OpenDSS e desenvolvimento de ferramentas para monitoramento 
 e melhoria da qualidade de energia.
