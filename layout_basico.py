@@ -133,6 +133,14 @@ def carregar_e_plotar(nome_monitor, monitor_info, monitor_key):
         st.error(f"Nenhum arquivo encontrado para {nome_monitor}.")
         return None, None, None, None
     
+    # NOVO: FILTRO PARA REMOVER COLUNAS ZERADAS (Neutro inexistente)
+    # Mantemos colunas de tempo (hour/time) mesmo que comecem em 0
+    colunas_com_dados = [
+        c for c in df.columns 
+        if not (df[c] == 0).all() or c.lower() in ["hour", "time", "step"]
+    ]
+    df = df[colunas_com_dados]
+
     # Identificar colunas
     eixo_x = next((c for c in df.columns if c.lower() in ["hour", "time"]), df.columns[0])
     colunas_y = [c for c in df.columns if c != eixo_x]
