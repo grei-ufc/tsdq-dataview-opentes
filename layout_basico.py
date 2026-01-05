@@ -26,7 +26,7 @@ def render_cabecalho():
             """
             <div align="center">
             <a target="_blank" href="https://github.com/grei-ufc" style="background:none">
-                <img src="https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Ilustra%C3%A7%C3%A3o%20fontes%20e%20transmissao.png" width="150">
+                <img src="https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Grei3.png" width="150">
             </a>
             </div>
             """,
@@ -62,25 +62,52 @@ def render_cabecalho():
     
     # Descrição
     st.markdown("""
-    Painel interativo para visualização dos resultados obtidos a partir dos monitores do arquivo `Daily.dss`.
+    Este aplicativo realiza a visualização e análise de dados elétricos provenientes da simulação `Daily.dss`, com foco em qualidade da energia elétrica, conforme diretrizes do PRODIST – Módulo 8.
+    O sistema foi desenvolvido para apoiar estudos em redes de distribuição, permitindo avaliar o comportamento das tensões ao longo do tempo e entre diferentes barras.
     """)
 
 # ============================================================================
 # 4. MAPEAMENTO DE ARQUIVOS E CONFIGURAÇÕES
 # ============================================================================
 MAPA_ARQUIVOS = {
-    "Tensão Subestação": {
+    "Tensão e Corrente Subestação": {
         "path": "Exemplos/Daily/Equivalente_Mon_tensaosub_1*.csv",
     },
-    "Tensão Carga D": {
+    "Tensão e Corrente Carga D": {
         "path": "Exemplos/Daily/Equivalente_Mon_tensaocargad_1*.csv",
     },
-    "Potência Subestação": {
+    "Potências Subestação": {
         "path": "Exemplos/Daily/Equivalente_Mon_potenciasub_1*.csv",
     },
-    "Potência Carga D": {
+    "Potências Carga D": {
         "path": "Exemplos/Daily/Equivalente_Mon_potenciacargad_1*.csv",
     },
+}
+
+# ============================================================================
+# MAPA DE LEGENDAS (Tradução de V1 -> Fase A)
+# ============================================================================
+MAPA_LEGENDAS = {
+    # Tensões
+    "V1": "Fase A (kV)",
+    "V2": "Fase B (kV)",
+    "V3": "Fase C (kV)",
+    "Angle1": "Ângulo A (°)",
+    "Angle2": "Ângulo B (°)",
+    "Angle3": "Ângulo C (°)",
+    
+    # Correntes
+    "I1": "Corrente A (A)",
+    "I2": "Corrente B (A)",
+    "I3": "Corrente C (A)",
+    
+    # Potências (Depende do mode=1 ppolar=no do DSS)
+    "P1": "Pot. Ativa A (kW)",
+    "P2": "Pot. Ativa B (kW)",
+    "P3": "Pot. Ativa C (kW)",
+    "Q1": "Pot. Reativa A (kvar)",
+    "Q2": "Pot. Reativa B (kvar)",
+    "Q3": "Pot. Reativa C (kvar)"
 }
 
 # ============================================================================
@@ -122,6 +149,28 @@ def detectar_grupo(df, canal):
     
     return grupo, titulo
 
+def listar_grupos_para_3d(df):
+    """Varre o dataframe e encontra grupos (V, I, P, Q) para o 3D"""
+    grupos = {}
+    
+    # Procura colunas de Tensão (V1, V2...)
+    v_cols = [c for c in df.columns if re.match(r"V\d", c, re.IGNORECASE)]
+    if v_cols: grupos["Tensões"] = v_cols
+        
+    # Procura colunas de Corrente (I1, I2...)
+    i_cols = [c for c in df.columns if re.match(r"I\d", c, re.IGNORECASE)]
+    if i_cols: grupos["Correntes"] = i_cols
+        
+    # Procura Potências (P...)
+    p_cols = [c for c in df.columns if c.lower().startswith("p")]
+    if p_cols: grupos["Potência Ativa"] = p_cols
+        
+    # Procura Reativos (Q...)
+    q_cols = [c for c in df.columns if c.lower().startswith("q")]
+    if q_cols: grupos["Potência Reativa"] = q_cols
+        
+    return grupos
+
 # ============================================================================
 # 6. FUNÇÃO PRINCIPAL DE PLOTAGEM
 # ============================================================================
@@ -133,8 +182,7 @@ def carregar_e_plotar(nome_monitor, monitor_info, monitor_key):
         st.error(f"Nenhum arquivo encontrado para {nome_monitor}.")
         return None, None, None, None
     
-    # NOVO: FILTRO PARA REMOVER COLUNAS ZERADAS (Neutro inexistente)
-    # Mantemos colunas de tempo (hour/time) mesmo que comecem em 0
+    # Filtro de colunas zeradas
     colunas_com_dados = [
         c for c in df.columns 
         if not (df[c] == 0).all() or c.lower() in ["hour", "time", "step"]
@@ -156,41 +204,47 @@ def carregar_e_plotar(nome_monitor, monitor_info, monitor_key):
     
     grupo, titulo = detectar_grupo(df, canal)
     
-    # Layout de colunas para os gráficos
     col1, col2 = st.columns(2)
     
     with col1:
-        # Gráfico individual
+        # --- GRÁFICO INDIVIDUAL ---
+        # Define o título do eixo Y
         yaxis_label = canal
-        if canal.startswith(('V', 'v')):
-            yaxis_label = f"{canal} [V]"
-        elif canal.startswith(('I', 'i')):
-            yaxis_label = f"{canal} [A]"
-        elif canal.startswith(('P', 'p')):
-            yaxis_label = f"{canal} [W]"
-        elif canal.startswith(('Q', 'q')):
-            yaxis_label = f"{canal} [VAR]"
+        if canal.startswith(('V', 'v')): yaxis_label = "Tensão [V]"
+        elif canal.startswith(('I', 'i')): yaxis_label = "Corrente [A]"
+        elif canal.startswith(('P', 'p')): yaxis_label = "Potência [kW]"
         
-        fig = px.line(df, x=eixo_x, y=canal, title=f"{nome_monitor} - {canal}", markers=True)
+        # Cria o gráfico usando o nome original (V1)
+        fig = px.line(df, x=eixo_x, y=canal, title=f"{nome_monitor} - Detalhe", markers=True)
+        
+        # AQUI ACONTECE A MÁGICA: Renomeia a legenda visualmente
+        novo_nome = MAPA_LEGENDAS.get(canal, canal)
+        fig.for_each_trace(lambda t: t.update(name=novo_nome, legendgroup=novo_nome, hovertemplate=t.hovertemplate.replace(t.name, novo_nome)))
+        
         fig.update_layout(xaxis_title="Hora", yaxis_title=yaxis_label, template="plotly_white")
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        # Gráfico de grupo (se aplicável)
+        # --- GRÁFICO DE GRUPO (Todas as fases) ---
         if grupo:
-            fig2 = px.line(df, x=eixo_x, y=grupo, title=f"{nome_monitor} - {titulo}", markers=True)
+            fig2 = px.line(df, x=eixo_x, y=grupo, title=f"{nome_monitor} - Trifásico", markers=True)
+            
+            # Renomeia todas as linhas do grupo (V1->Fase A, V2->Fase B...)
+            fig2.for_each_trace(lambda t: t.update(name=MAPA_LEGENDAS.get(t.name, t.name)))
+            
             fig2.update_layout(xaxis_title="Hora", yaxis_title=titulo, template="plotly_white")
             
-            # Símbolos diferentes para cada linha
-            symbols = ["circle", "square", "diamond", "cross", "x", "triangle-up", "triangle-down"]
+            # Símbolos diferentes
+            symbols = ["circle", "square", "diamond", "cross", "x", "triangle-up"]
             for i, col in enumerate(grupo):
-                fig2.update_traces(selector=dict(name=col), marker_symbol=symbols[i % len(symbols)])
+                # Precisamos usar o nome original 'col' para selecionar, depois atualizar
+                nome_legenda = MAPA_LEGENDAS.get(col, col)
+                fig2.update_traces(selector=dict(name=nome_legenda), marker_symbol=symbols[i % len(symbols)])
             
             st.plotly_chart(fig2, use_container_width=True)
         else:
-            st.info("Tipo de variável não identificado para exibição em grupo.")
+            st.info("Visualização em grupo não disponível para esta variável.")
     
-    # Tabela de dados expandível
     with st.expander("Ver tabela de dados"):
         st.dataframe(df)
     
@@ -199,280 +253,97 @@ def carregar_e_plotar(nome_monitor, monitor_info, monitor_key):
 # ============================================================================
 # 7. FUNÇÃO DE VISUALIZAÇÃO 3D (VERSÃO CORRIGIDA)
 # ============================================================================
-def render_visualizacao_3d(df_sub, eixo_x_sub, grupo_sub, df_carga, eixo_x_carga, grupo_carga):
-    """Versão melhorada com contêiner expansível para gráfico 3D"""
-    st.divider()
-    st.subheader("Visualização 3D (valores reais)")
+# --- SUBSTITUA A FUNÇÃO render_visualizacao_3d POR ESTA ---
+def render_visualizacao_3d_independente():
+    st.markdown("## Visualização Espacial (3D)")
+
+    # 1. SELEÇÃO DO ARQUIVO (Agora independente)
+    monitor_selecionado = st.selectbox(
+        "Selecione o Monitor/Arquivo:", 
+        list(MAPA_ARQUIVOS.keys()),
+        key="sel_3d_source"
+    )
+
+    # 2. CARREGAMENTO (Backend)
+    caminho = MAPA_ARQUIVOS[monitor_selecionado]["path"]
+    df = carregar_dados(caminho)
     
-    # Verificar quais dados estão disponíveis
-    opcoes_3d = []
-    if df_sub is not None and grupo_sub:
-        opcoes_3d.append("Subestação")
-    if df_carga is not None and grupo_carga:
-        opcoes_3d.append("Carga D")
-    
-    if not opcoes_3d:
-        st.info("Nenhum dado disponível para visualização 3D ou grupo de variáveis não identificado.")
+    if df is None:
+        st.error("Dados não encontrados.")
         return
+
+    # Filtro de colunas zeradas
+    colunas_validas = [
+        c for c in df.columns 
+        if not (df[c] == 0).all() or c.lower() in ["hour", "time", "step"]
+    ]
+    df = df[colunas_validas]
+
+    # Eixo X
+    eixo_x = next((c for c in df.columns if c.lower() in ["hour", "time"]), df.columns[0])
+
+    # 3. IDENTIFICAR GRUPOS
+    grupos_disponiveis = listar_grupos_para_3d(df)
     
-    # Seleção do conjunto de dados
-    selecao_3d = st.selectbox("Selecione o conjunto de dados para visualização 3D:", opcoes_3d)
-    
-    # Definir dados baseado na seleção
-    if selecao_3d == "Subestação" and df_sub is not None and grupo_sub:
-        df = df_sub
-        eixo_x = eixo_x_sub
-        grupo = grupo_sub
-        titulo_base = "Subestação"
-    elif selecao_3d == "Carga D" and df_carga is not None and grupo_carga:
-        df = df_carga
-        eixo_x = eixo_x_carga
-        grupo = grupo_carga
-        titulo_base = "Carga D"
-    else:
-        st.warning("Grupo de variáveis não disponível para visualização 3D.")
+    if not grupos_disponiveis:
+        st.warning("Nenhum grupo compatível (V, I, P, Q) encontrado para 3D.")
         return
+
+    tipo_visualizacao = st.selectbox(
+        "Selecione o Grupo de Variáveis:", 
+        list(grupos_disponiveis.keys()),
+        key="sel_3d_type"
+    )
     
-    # Container expansível para controles
-    with st.expander(" Configurações do Gráfico 3D", expanded=True):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            altura = st.slider("Altura do gráfico", 600, 1200, 800, 50)
-        with col2:
-            proporcao = st.selectbox("Proporção padrão", 
-                                    ["Automática", "1:1:1", "2:1:1", "1:2:1", "1:1:2"])
-        with col3:
-            rotacao_inicial = st.selectbox("Rotação inicial",
-                                          ["Padrão", "Vista Superior", "Vista Lateral", "Vista Isométrica"])
-    
-    # Criar gráfico 3D
+    grupo = grupos_disponiveis[tipo_visualizacao] # ex: ['V1', 'V2', 'V3']
+
+    # 4. CONFIGURAÇÕES VISUAIS
+    with st.expander("⚙️ Configurações do Gráfico", expanded=True):
+        altura = st.slider("Altura do gráfico", 600, 1200, 800, 50)
+
+    # 5. PLOTAGEM
     with st.container():
-        # Usar CSS para criar um contêiner maior
-        st.markdown(
-            """
-            <style>
-            .big-plot-container {
-                border: 1px solid #ddd;
-                border-radius: 10px;
-                padding: 10px;
-                background-color: #f9f9f9;
-                margin-bottom: 20px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
+        # CSS para borda
+        st.markdown('<div style="border:1px solid #ddd; padding:10px; border-radius:10px;">', unsafe_allow_html=True)
         
-        st.markdown('<div class="big-plot-container">', unsafe_allow_html=True)
-        
-        # Preparar dados para o gráfico 3D
         x_vals = df[eixo_x].values
+        y_vals_originais = grupo
+        y_vals_legiveis = [MAPA_LEGENDAS.get(c, c) for c in grupo] # Transforma [V1, V2] em [Fase A, Fase B]
+        y_indices = np.arange(len(y_vals_originais))
         
-        # IMPORTANTE: Usar os nomes reais das variáveis, não números
-        y_vals = grupo  # Lista com os nomes das variáveis (ex: ['I1', 'I2', 'I3', 'I4'])
-        y_indices = np.arange(len(grupo))  # Índices numéricos para o meshgrid
-        
-        # Criar meshgrid
+        # Meshgrid
         X, Y_indices = np.meshgrid(x_vals, y_indices)
-        Z = df[grupo].values.T  # Transpor para ter dimensões (variáveis, tempo)
+        Z = df[grupo].values.T
         
-        # Definir label do eixo Z baseado no tipo de variável
-        if grupo[0].startswith('V'):
-            z_label = "Tensão [V]"
-            titulo_tipo = "Tensões"
-            colorscale = 'Viridis'
-        elif grupo[0].startswith('I'):
-            z_label = "Corrente [A]"
-            titulo_tipo = "Correntes"
-            colorscale = 'Plasma'
-        elif grupo[0].startswith('P'):
-            z_label = "Potência Ativa [W]"
-            titulo_tipo = "Potências Ativas"
-            colorscale = 'RdYlBu'
-        elif grupo[0].startswith('Q'):
-            z_label = "Potência Reativa [VAR]"
-            titulo_tipo = "Potências Reativas"
-            colorscale = 'RdBu'
-        else:
-            z_label = "Magnitude"
-            titulo_tipo = "Variáveis"
-            colorscale = 'Viridis'
+        # Cor baseada no tipo
+        colorscale = 'RdYlBu' if "Potência" in tipo_visualizacao else 'Viridis'
         
-        # Configurar câmera baseado na seleção
-        if rotacao_inicial == "Vista Superior":
-            camera = dict(eye=dict(x=0, y=0, z=2.5))
-        elif rotacao_inicial == "Vista Lateral":
-            camera = dict(eye=dict(x=2.5, y=0, z=0))
-        elif rotacao_inicial == "Vista Isométrica":
-            camera = dict(eye=dict(x=1.5, y=1.5, z=1.5))
-        else:  # Padrão
-            camera = dict(eye=dict(x=1.8, y=1.8, z=1.2))
-        
-        # Configurar proporções
-        if proporcao == "1:1:1":
-            aspect = dict(x=1, y=1, z=1)
-        elif proporcao == "2:1:1":
-            aspect = dict(x=2, y=1, z=1)
-        elif proporcao == "1:2:1":
-            aspect = dict(x=1, y=2, z=1)
-        elif proporcao == "1:1:2":
-            aspect = dict(x=1, y=1, z=2)
-        else:
-            # Automática: baseada nos dados
-            x_range = x_vals.max() - x_vals.min()
-            y_range = len(grupo)
-            z_range = Z.max() - Z.min()
-            max_range = max(x_range, y_range, z_range)
-            aspect = dict(
-                x=x_range/max_range if max_range > 0 else 1,
-                y=y_range/max_range if max_range > 0 else 1,
-                z=z_range/max_range if max_range > 0 else 1
-            )
-        
-        # Criar o gráfico de superfície
+        # Câmera e Aspecto Fixos
+        camera = dict(eye=dict(x=1.8, y=1.8, z=1.2))
+        aspect = dict(x=1, y=1, z=1)
+
         fig3d = go.Figure(data=[go.Surface(
-            x=X,  # Eixo X: tempo
-            y=Y_indices,  # Eixo Y: índices numéricos das variáveis
-            z=Z,  # Eixo Z: valores das variáveis
+            x=X, y=Y_indices, z=Z,
             colorscale=colorscale,
-            showscale=True,
-            colorbar=dict(
-                title=z_label,
-                title_side='right'
-            ),
-            contours={
-                "z": {"show": True, "usecolormap": True, "highlightcolor": "limegreen", "project": {"z": True}}
-            },
-            hovertemplate=(
-                "Hora: %{x:.2f}<br>" +
-                "Variável: %{text}<br>" +
-                f"{z_label}: %{{z:.4f}}<br>" +
-                "<extra></extra>"
-            ),
-            text=[[y_vals[int(y)] for _ in range(len(x_vals))] for y in range(len(y_vals))]
+            colorbar=dict(title=tipo_visualizacao)
         )])
         
-        # Configurar layout
         fig3d.update_layout(
-            title=f"Visualização 3D - {titulo_base} - {titulo_tipo}",
-            scene=dict(
-                xaxis=dict(
-                    title="Hora",
-                    gridcolor="lightgray",
-                    showbackground=True,
-                    backgroundcolor="rgba(240, 240, 240, 0.1)"
-                ),
-                yaxis=dict(
-                    title="Variáveis",
-                    tickvals=y_indices,  # Posições dos ticks
-                    ticktext=y_vals,     # Labels dos ticks (nomes das variáveis)
-                    gridcolor="lightgray",
-                    showbackground=True,
-                    backgroundcolor="rgba(240, 240, 240, 0.1)"
-                ),
-                zaxis=dict(
-                    title=z_label,
-                    gridcolor="lightgray",
-                    showbackground=True,
-                    backgroundcolor="rgba(240, 240, 240, 0.1)"
-                ),
+        title=f"3D: {monitor_selecionado} - {tipo_visualizacao}",
+        scene=dict(
+            xaxis_title="Tempo",
+            # AQUI: Usa os nomes legíveis no eixo Y
+            yaxis=dict(title="Fases", tickvals=y_indices, ticktext=y_vals_legiveis),
+            zaxis_title="Magnitude",
                 aspectmode="manual",
                 aspectratio=aspect,
                 camera=camera
             ),
-            template="plotly_white",
             height=altura,
-            margin=dict(l=10, r=10, t=50, b=10)
+            margin=dict(l=0, r=0, b=0, t=40)
         )
         
-        # Adicionar botão de reset da câmera
-        fig3d.update_layout(
-            updatemenus=[
-                dict(
-                    type="buttons",
-                    showactive=False,
-                    buttons=[
-                        dict(
-                            label="Reset View",
-                            method="relayout",
-                            args=["scene.camera", camera]
-                        )
-                    ],
-                    x=0.05,
-                    y=0.98,
-                    xanchor="left",
-                    yanchor="top"
-                )
-            ]
-        )
-        
-        st.plotly_chart(fig3d, use_container_width=True, config={
-            'displayModeBar': True,
-            'scrollZoom': True,
-            'modeBarButtonsToAdd': ['resetCameraDefault3d'],
-            'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
-            'displaylogo': False
-        })
-        
-        # Legenda das variáveis
-        st.markdown("**Legenda das variáveis no eixo Y:**")
-        
-        # Criar uma tabela com as variáveis e seus índices
-        legend_data = []
-        for i, var in enumerate(grupo):
-            # Determinar tipo de variável
-            if var.startswith('V'):
-                tipo = "Tensão"
-                unidade = "V"
-            elif var.startswith('I'):
-                tipo = "Corrente"
-                unidade = "A"
-            elif var.startswith('P'):
-                tipo = "Potência Ativa"
-                unidade = "W"
-            elif var.startswith('Q'):
-                tipo = "Potência Reativa"
-                unidade = "VAR"
-            else:
-                tipo = "Desconhecido"
-                unidade = ""
-            
-            legend_data.append({
-                "Índice": i,
-                "Variável": var,
-                "Tipo": tipo,
-                "Unidade": unidade
-            })
-        
-        # Mostrar legenda em formato de tabela
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Correspondência no gráfico 3D:**")
-            for item in legend_data:
-                st.markdown(f"**{item['Índice']}** = {item['Variável']}")
-        
-        with col2:
-            st.markdown("**Estatísticas das variáveis:**")
-            # Calcular estatísticas básicas
-            stats_df = pd.DataFrame({
-                "Variável": grupo,
-                "Mínimo": [df[var].min() for var in grupo],
-                "Máximo": [df[var].max() for var in grupo],
-                "Média": [df[var].mean() for var in grupo],
-                "Desvio Padrão": [df[var].std() for var in grupo]
-            })
-            
-            # Formatar números
-            styled_stats = stats_df.style.format({
-                'Mínimo': '{:.4f}',
-                'Máximo': '{:.4f}',
-                'Média': '{:.4f}',
-                'Desvio Padrão': '{:.4f}'
-            })
-            
-            st.dataframe(styled_stats, use_container_width=True, height=200)
-        
+        st.plotly_chart(fig3d, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================================
@@ -835,69 +706,55 @@ def render_analise_desequilibrio(df_sub, df_carga):
 # 9. FUNÇÃO PRINCIPAL DO APLICATIVO
 # ============================================================================
 def main():
-    """Função principal que orquestra todo o aplicativo"""
-    # Renderizar cabeçalho
+    """Função principal com navegação lateral"""
+    
+    # Menu Lateral
+    with st.sidebar:
+        st.title("Navegação")
+        pagina = st.radio(
+            "Ir para:",
+            ["Análise Linear (2D)", "Topologia (3D)"]
+        )
+        st.divider()
+
     render_cabecalho()
-    
-    # Seleção do tipo de variável
-    st.subheader("Seleção de tipo de variável")
-    tipo_variavel = st.radio(
-        "Escolha o tipo de variável:",
-        ["Tensão, corrente e ângulo", "Potência ativa e reativa"],
-        horizontal=True
-    )
-    
-    st.divider()
-    
-    # Variáveis para armazenar dados
-    df_sub = None
-    df_carga = None
-    eixo_x_sub = None
-    eixo_x_carga = None
-    grupo_sub = None
-    grupo_carga = None
-    
-    # Layout principal com abas
-    with st.container():
+
+    # ROTA 1: ANÁLISE 2D (Mantém a lógica antiga aqui dentro)
+    if pagina == "Análise Linear (2D)":
+        st.subheader("Análise Linear e Desequilíbrio")
+        
+        tipo_variavel = st.radio(
+            "Escolha o tipo de variável:",
+            ["Tensão, corrente e ângulo", "Potência ativa e reativa"],
+            horizontal=True
+        )
+        st.divider()
+
+        # Inicializa variáveis para o Desequilíbrio usar depois
+        df_sub = None
+        df_carga = None
+        
+        # Lógica de Abas 2D
         if tipo_variavel == "Tensão, corrente e ângulo":
-            tab1, tab2 = st.tabs(["Tensão Subestação", "Tensão Carga D"])
-            
+            tab1, tab2 = st.tabs(["Tensão e Corrente Subestação", "Tensão e Corrente Carga D"])
             with tab1:
-                df_sub, eixo_x_sub, _, grupo_sub = carregar_e_plotar(
-                    "Tensão Subestação", 
-                    MAPA_ARQUIVOS["Tensão Subestação"], 
-                    "sub"
-                )
-            
+                df_sub, _, _, _ = carregar_e_plotar("Tensão e Corrente Subestação", MAPA_ARQUIVOS["Tensão e Corrente Subestação"], "sub")
             with tab2:
-                df_carga, eixo_x_carga, _, grupo_carga = carregar_e_plotar(
-                    "Tensão Carga D", 
-                    MAPA_ARQUIVOS["Tensão Carga D"], 
-                    "carga"
-                )
+                df_carga, _, _, _ = carregar_e_plotar("Tensão e Corrente Carga D", MAPA_ARQUIVOS["Tensão e Corrente Carga D"], "carga")
         
         elif tipo_variavel == "Potência ativa e reativa":
-            tab1, tab2 = st.tabs(["Potência Subestação", "Potência Carga D"])
-            
+            tab1, tab2 = st.tabs(["Potências Subestação", "Potências Carga D"])
             with tab1:
-                df_sub, eixo_x_sub, _, grupo_sub = carregar_e_plotar(
-                    "Potência Subestação", 
-                    MAPA_ARQUIVOS["Potência Subestação"], 
-                    "sub"
-                )
-            
+                df_sub, _, _, _ = carregar_e_plotar("Potências Subestação", MAPA_ARQUIVOS["Potências Subestação"], "sub")
             with tab2:
-                df_carga, eixo_x_carga, _, grupo_carga = carregar_e_plotar(
-                    "Potência Carga D", 
-                    MAPA_ARQUIVOS["Potência Carga D"], 
-                    "carga"
-                )
-    
-    # Renderizar visualização 3D
-    render_visualizacao_3d(df_sub, eixo_x_sub, grupo_sub, df_carga, eixo_x_carga, grupo_carga)
-    
-    # Renderizar análise de desequilíbrio de tensão
-    render_analise_desequilibrio(df_sub, df_carga)
+                df_carga, _, _, _ = carregar_e_plotar("Potências Carga D", MAPA_ARQUIVOS["Potências Carga D"], "carga")
+
+        # Chama Análise de Desequilíbrio (Continua aqui pois depende dos dados 2D)
+        render_analise_desequilibrio(df_sub, df_carga)
+
+    # ROTA 2: ANÁLISE 3D (Totalmente isolada)
+    elif pagina == "Topologia (3D)":
+        render_visualizacao_3d_independente()
 
 # ============================================================================
 # 10. EXECUÇÃO DO APLICATIVO
