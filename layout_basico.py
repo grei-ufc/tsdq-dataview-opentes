@@ -69,7 +69,7 @@ def render_cabecalho():
     st.markdown("---") # Uma linha divisória
     st.markdown("### Topologia do Sistema Analisado")
     st.image(
-        "https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Diagrama%20SEP%20Daily.png", 
+        "https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Diagrama%20sep%20daily.drawio.png", 
         caption="Diagrama Unifilar Simplificado",
         use_container_width=True
     )
@@ -717,9 +717,23 @@ def render_analise_desequilibrio(df_sub, df_carga):
 def main():
     """Função principal com navegação lateral"""
     
+    # --- CSS PARA ESTREITAR A SIDEBAR ---
+    st.markdown(
+        """
+        <style>
+            [data-testid="stSidebar"] {
+                min-width: 200px;
+                max-width: 200px;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # Menu Lateral
     with st.sidebar:
-        st.title("Navegação")
+        # DICA: Troque st.title por st.markdown ou st.header para reduzir margem vertical
+        st.header("Navegação")
         pagina = st.radio(
             "Ir para:",
             ["Análise Linear (2D)", "Topologia (3D)"]
@@ -730,7 +744,7 @@ def main():
 
     # ROTA 1: ANÁLISE 2D (Mantém a lógica antiga aqui dentro)
     if pagina == "Análise Linear (2D)":
-        st.subheader("Análise Linear e Desequilíbrio")
+        st.subheader("Análise Linear e Desequilíbrio", divider="green")
         
         tipo_variavel = st.radio(
             "Escolha o tipo de variável:",
