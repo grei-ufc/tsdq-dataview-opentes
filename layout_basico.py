@@ -66,6 +66,15 @@ def render_cabecalho():
     O sistema foi desenvolvido para apoiar estudos em redes de distribuição, permitindo avaliar o comportamento das tensões ao longo do tempo e entre diferentes barras.
     """)
 
+    st.markdown("---") # Uma linha divisória
+    st.markdown("### Topologia do Sistema Analisado")
+    st.image(
+        "https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Diagrama%20SEP%20Daily.png", 
+        caption="Diagrama Unifilar Simplificado",
+        use_container_width=True
+    )
+    st.markdown("---")
+
 # ============================================================================
 # 4. MAPEAMENTO DE ARQUIVOS E CONFIGURAÇÕES
 # ============================================================================
