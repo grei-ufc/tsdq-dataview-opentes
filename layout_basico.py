@@ -79,17 +79,26 @@ def render_cabecalho():
 # 4. MAPEAMENTO DE ARQUIVOS E CONFIGURAÇÕES
 # ============================================================================
 MAPA_ARQUIVOS = {
+    #LADO DE ALTA (138kV)
     "Tensão e Corrente Subestação": {
         "path": "Exemplos/Daily/Equivalente_Mon_tensaosub_1*.csv",
-    },
-    "Tensão e Corrente Carga D": {
-        "path": "Exemplos/Daily/Equivalente_Mon_tensaocargad_1*.csv",
     },
     "Potências Subestação": {
         "path": "Exemplos/Daily/Equivalente_Mon_potenciasub_1*.csv",
     },
+    #LADO DE BAIXA (13.8 kV)
+    "Tensão e Corrente Subestação (Baixa)": {
+        "path": "Exemplos/Daily/Equivalente_Mon_tensaosubbaixa_1*.csv",
+    },
+    "Potências Subestação (Baixa)": {
+        "path": "Exemplos/Daily/Equivalente_Mon_potenciasubbaixa_1*.csv",
+    },
+    #CARGAS
     "Potências Carga D": {
         "path": "Exemplos/Daily/Equivalente_Mon_potenciacargad_1*.csv",
+    },
+     "Tensão e Corrente Carga D": {
+        "path": "Exemplos/Daily/Equivalente_Mon_tensaocargad_1*.csv",
     },
     "Tensão e Corrente Carga C": {
         "path": "Exemplos/Daily/Equivalente_Mon_tensaocargac_1*.csv",
@@ -313,53 +322,69 @@ def render_visualizacao_3d_independente():
     grupo = grupos_disponiveis[tipo_visualizacao] # ex: ['V1', 'V2', 'V3']
 
     # 4. CONFIGURAÇÕES VISUAIS
-    with st.expander("⚙️ Configurações do Gráfico", expanded=True):
-        altura = st.slider("Altura do gráfico", 600, 1200, 800, 50)
-
-    # 5. PLOTAGEM
+    #with st.expander("⚙️ Configurações do Gráfico", expanded=True):
+    #    altura = st.slider("Altura do gráfico", 600, 1200, 800, 50)
+    altura = 800
+   # 5. PLOTAGEM
     with st.container():
-        # CSS para borda
-        st.markdown('<div style="border:1px solid #ddd; padding:10px; border-radius:10px;">', unsafe_allow_html=True)
-        
-        x_vals = df[eixo_x].values
-        y_vals_originais = grupo
-        y_vals_legiveis = [MAPA_LEGENDAS.get(c, c) for c in grupo] # Transforma [V1, V2] em [Fase A, Fase B]
-        y_indices = np.arange(len(y_vals_originais))
-        
-        # Meshgrid
-        X, Y_indices = np.meshgrid(x_vals, y_indices)
-        Z = df[grupo].values.T
-        
-        # Cor baseada no tipo
-        colorscale = 'RdYlBu' if "Potência" in tipo_visualizacao else 'Viridis'
-        
-        # Câmera e Aspecto Fixos
-        camera = dict(eye=dict(x=1.8, y=1.8, z=1.2))
-        aspect = dict(x=1, y=1, z=1)
+        # Cria o container com borda que vai envolver TUDO
+        # A altura fixa (height) aqui ajuda a manter a caixa estável
+        with st.container(border=True):
+            
+            # --- Texto de Instrução (Dentro da caixa) ---
+            st.markdown("""
+                <h4 style="text-align: center; color: #d9534f; margin: 0;">
+            """, unsafe_allow_html=True)
+            
+            # Preparação dos dados
+            x_vals = df[eixo_x].values
+            y_vals_originais = grupo
+            y_vals_legiveis = [MAPA_LEGENDAS.get(c, c) for c in grupo] 
+            y_indices = np.arange(len(y_vals_originais))
+            
+            X, Y_indices = np.meshgrid(x_vals, y_indices)
+            Z = df[grupo].values.T
+            
+            colorscale = 'RdYlBu' if "Potência" in tipo_visualizacao else 'Viridis'
+            camera = dict(eye=dict(x=1.8, y=1.8, z=1.2))
+            aspect = dict(x=1, y=1, z=1)
 
-        fig3d = go.Figure(data=[go.Surface(
-            x=X, y=Y_indices, z=Z,
-            colorscale=colorscale,
-            colorbar=dict(title=tipo_visualizacao)
-        )])
-        
-        fig3d.update_layout(
-        title=f"3D: {monitor_selecionado} - {tipo_visualizacao}",
-        scene=dict(
-            xaxis_title="Tempo",
-            # AQUI: Usa os nomes legíveis no eixo Y
-            yaxis=dict(title="Fases", tickvals=y_indices, ticktext=y_vals_legiveis),
-            zaxis_title="Magnitude",
-                aspectmode="manual",
-                aspectratio=aspect,
-                camera=camera
-            ),
-            height=altura,
-            margin=dict(l=0, r=0, b=0, t=40)
-        )
-        
-        st.plotly_chart(fig3d, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+            # 1. Superfície
+            fig3d = go.Figure(data=[go.Surface(
+                x=X, y=Y_indices, z=Z,
+                colorscale=colorscale,
+                colorbar=dict(title=tipo_visualizacao),
+                opacity=0.8,
+                name="Superfície"
+            )])
+
+            # 2. Linhas Vermelhas
+            for i, coluna in enumerate(grupo):
+                y_linha = [y_indices[i]] * len(x_vals)
+                z_linha = df[coluna].values
+                fig3d.add_trace(go.Scatter3d(
+                    x=x_vals, y=y_linha, z=z_linha,
+                    mode='lines',
+                    name=f"Traço: {y_vals_legiveis[i]}",
+                    line=dict(color='red', width=6),
+                    showlegend=False
+                ))
+            
+            fig3d.update_layout(
+                margin=dict(l=0, r=50, b=0, t=20), # Margens ajustadas para dentro da caixa
+                scene=dict(
+                    xaxis_title="Tempo",
+                    yaxis=dict(title="Fases", tickvals=y_indices, ticktext=y_vals_legiveis),
+                    zaxis_title="Magnitude",
+                    aspectmode="manual",
+                    aspectratio=aspect,
+                    camera=camera
+                ),
+                height=altura
+            )
+            
+            # --- GRÁFICO (Agora está fisicamente DENTRO do container) ---
+            st.plotly_chart(fig3d, use_container_width=True, config={'scrollZoom': True})
 
 # ============================================================================
 # 8. FUNÇÃO PARA CÁLCULO DE DESEQUILÍBRIO DE TENSÃO (PRODIST MÓDULO 8)
@@ -749,6 +774,7 @@ def main():
     render_cabecalho()
 
    # ROTA 1: ANÁLISE 2D
+    # ROTA 1: ANÁLISE 2D
     if pagina == "Análise Linear (2D)":
         st.subheader("Análise Linear e Desequilíbrio", divider="green")
         
@@ -759,17 +785,19 @@ def main():
         )
         st.divider()
 
-        # Inicializa variáveis para garantir que existam
-        df_sub = None
-        df_carga = None # Este representará a Carga D (Trifásica)
+        # Inicializa variáveis
+        df_sub = None       # Alta Tensão
+        df_sub_baixa = None # Baixa Tensão (NOVO)
+        df_carga = None     # Carga D
         
         # -----------------------------------------------------
         # CASO 1: TENSÃO, CORRENTE E ÂNGULO
         # -----------------------------------------------------
         if tipo_variavel == "Tensão, corrente e ângulo":
-            # Agora são 3 abas
-            tab1, tab2, tab3 = st.tabs([
-                "Subestação (AT)", 
+            # --- ATUALIZAÇÃO: AGORA SÃO 4 ABAS ---
+            tab1, tab2, tab3, tab4 = st.tabs([
+                "Subestação (AT - 138kV)", 
+                "Subestação (BT - 13.8kV)",  # <--- NOVA ABA
                 "Carga D (Ind. Trifásica)", 
                 "Carga C (Res. Monofásica)"
             ])
@@ -782,16 +810,21 @@ def main():
                 )
             
             with tab2:
-                # df_carga captura os dados da Carga D para o desequilíbrio
+                # --- AQUI CARREGAMOS A BAIXA TENSÃO ---
+                df_sub_baixa, _, _, _ = carregar_e_plotar(
+                    "Tensão e Corrente Subestação (Baixa)", 
+                    MAPA_ARQUIVOS["Tensão e Corrente Subestação (Baixa)"], 
+                    "sub_baixa_tensao"
+                )
+
+            with tab3:
                 df_carga, _, _, _ = carregar_e_plotar(
                     "Tensão e Corrente Carga D", 
                     MAPA_ARQUIVOS["Tensão e Corrente Carga D"], 
                     "carga_d_tensao"
                 )
             
-            with tab3:
-                # Carga C (Apenas visualização, não salva em variável de análise global)
-                # OBS: Mudei o id final para "carga_c_tensao" para não conflitar
+            with tab4:
                 carregar_e_plotar(
                     "Tensão e Corrente Carga C", 
                     MAPA_ARQUIVOS["Tensão e Corrente Carga C"], 
@@ -802,29 +835,37 @@ def main():
         # CASO 2: POTÊNCIA ATIVA E REATIVA
         # -----------------------------------------------------
         elif tipo_variavel == "Potência ativa e reativa":
-            # Aqui também precisamos de 3 abas agora
-            tab1, tab2, tab3 = st.tabs([
-                "Subestação (AT)", 
+            # --- ATUALIZAÇÃO: 4 ABAS TAMBÉM ---
+            tab1, tab2, tab3, tab4 = st.tabs([
+                "Subestação (AT - 138kV)", 
+                "Subestação (BT - 13.8kV)", # <--- NOVA ABA
                 "Carga D (Ind. Trifásica)", 
                 "Carga C (Res. Monofásica)"
             ])
             
             with tab1:
-                # Note que aqui não salvamos em df_sub/df_carga pois não faremos analise de desequilibrio com potência
                 carregar_e_plotar(
                     "Potências Subestação", 
                     MAPA_ARQUIVOS["Potências Subestação"], 
                     "sub_pot"
                 )
-            
+
             with tab2:
+                # --- AQUI CARREGAMOS A POTÊNCIA DA BAIXA ---
+                carregar_e_plotar(
+                    "Potências Subestação (Baixa)", 
+                    MAPA_ARQUIVOS["Potências Subestação (Baixa)"], 
+                    "sub_baixa_pot"
+                )
+            
+            with tab3:
                 carregar_e_plotar(
                     "Potências Carga D", 
                     MAPA_ARQUIVOS["Potências Carga D"], 
                     "carga_d_pot"
                 )
                 
-            with tab3:
+            with tab4:
                 carregar_e_plotar(
                     "Potências Carga C", 
                     MAPA_ARQUIVOS["Potências Carga C"], 
@@ -834,9 +875,13 @@ def main():
         # -----------------------------------------------------
         # ANÁLISE DE DESEQUILÍBRIO
         # -----------------------------------------------------
-        # Só executamos se estivermos no modo Tensão e se os dados foram carregados
         if tipo_variavel == "Tensão, corrente e ângulo":
-            if df_sub is not None and df_carga is not None:
+            # DICA: Geralmente o desequilíbrio é analisado na SAÍDA do trafo (Baixa)
+            # Se você quiser analisar a Baixa Tensão, troque df_sub por df_sub_baixa abaixo:
+            if df_sub_baixa is not None and df_carga is not None:
+                render_analise_desequilibrio(df_sub_baixa, df_carga)
+            elif df_sub is not None and df_carga is not None:
+                # Fallback para Alta Tensão se a Baixa não carregar
                 render_analise_desequilibrio(df_sub, df_carga)
             else:
                 st.warning("Aguardando carregamento dos dados para análise de desequilíbrio...")
