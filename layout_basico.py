@@ -69,7 +69,7 @@ def render_cabecalho():
     st.markdown("---") # Uma linha divisória
     st.markdown("### Topologia do Sistema Analisado")
     st.image(
-        "https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Diagrama%20sep%20daily.drawio.png", 
+        "https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Diagrama%20SEP%20cargac.jpg", 
         caption="Diagrama Unifilar Simplificado",
         use_container_width=True
     )
