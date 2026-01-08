@@ -91,6 +91,12 @@ MAPA_ARQUIVOS = {
     "Potências Carga D": {
         "path": "Exemplos/Daily/Equivalente_Mon_potenciacargad_1*.csv",
     },
+    "Tensão e Corrente Carga C": {
+        "path": "Exemplos/Daily/Equivalente_Mon_tensaocargac_1*.csv",
+    },
+    "Potências Carga C": {
+        "path": "Exemplos/Daily/Equivalente_Mon_potenciacargac_1*.csv"
+    }
 }
 
 # ============================================================================
@@ -742,7 +748,7 @@ def main():
 
     render_cabecalho()
 
-    # ROTA 1: ANÁLISE 2D (Mantém a lógica antiga aqui dentro)
+   # ROTA 1: ANÁLISE 2D
     if pagina == "Análise Linear (2D)":
         st.subheader("Análise Linear e Desequilíbrio", divider="green")
         
@@ -753,27 +759,87 @@ def main():
         )
         st.divider()
 
-        # Inicializa variáveis para o Desequilíbrio usar depois
+        # Inicializa variáveis para garantir que existam
         df_sub = None
-        df_carga = None
+        df_carga = None # Este representará a Carga D (Trifásica)
         
-        # Lógica de Abas 2D
+        # -----------------------------------------------------
+        # CASO 1: TENSÃO, CORRENTE E ÂNGULO
+        # -----------------------------------------------------
         if tipo_variavel == "Tensão, corrente e ângulo":
-            tab1, tab2 = st.tabs(["Tensão e Corrente Subestação", "Tensão e Corrente Carga D"])
+            # Agora são 3 abas
+            tab1, tab2, tab3 = st.tabs([
+                "Subestação (AT)", 
+                "Carga D (Ind. Trifásica)", 
+                "Carga C (Res. Monofásica)"
+            ])
+            
             with tab1:
-                df_sub, _, _, _ = carregar_e_plotar("Tensão e Corrente Subestação", MAPA_ARQUIVOS["Tensão e Corrente Subestação"], "sub")
+                df_sub, _, _, _ = carregar_e_plotar(
+                    "Tensão e Corrente Subestação", 
+                    MAPA_ARQUIVOS["Tensão e Corrente Subestação"], 
+                    "sub_tensao"
+                )
+            
             with tab2:
-                df_carga, _, _, _ = carregar_e_plotar("Tensão e Corrente Carga D", MAPA_ARQUIVOS["Tensão e Corrente Carga D"], "carga")
-        
-        elif tipo_variavel == "Potência ativa e reativa":
-            tab1, tab2 = st.tabs(["Potências Subestação", "Potências Carga D"])
-            with tab1:
-                df_sub, _, _, _ = carregar_e_plotar("Potências Subestação", MAPA_ARQUIVOS["Potências Subestação"], "sub")
-            with tab2:
-                df_carga, _, _, _ = carregar_e_plotar("Potências Carga D", MAPA_ARQUIVOS["Potências Carga D"], "carga")
+                # df_carga captura os dados da Carga D para o desequilíbrio
+                df_carga, _, _, _ = carregar_e_plotar(
+                    "Tensão e Corrente Carga D", 
+                    MAPA_ARQUIVOS["Tensão e Corrente Carga D"], 
+                    "carga_d_tensao"
+                )
+            
+            with tab3:
+                # Carga C (Apenas visualização, não salva em variável de análise global)
+                # OBS: Mudei o id final para "carga_c_tensao" para não conflitar
+                carregar_e_plotar(
+                    "Tensão e Corrente Carga C", 
+                    MAPA_ARQUIVOS["Tensão e Corrente Carga C"], 
+                    "carga_c_tensao"
+                )
 
-        # Chama Análise de Desequilíbrio (Continua aqui pois depende dos dados 2D)
-        render_analise_desequilibrio(df_sub, df_carga)
+        # -----------------------------------------------------
+        # CASO 2: POTÊNCIA ATIVA E REATIVA
+        # -----------------------------------------------------
+        elif tipo_variavel == "Potência ativa e reativa":
+            # Aqui também precisamos de 3 abas agora
+            tab1, tab2, tab3 = st.tabs([
+                "Subestação (AT)", 
+                "Carga D (Ind. Trifásica)", 
+                "Carga C (Res. Monofásica)"
+            ])
+            
+            with tab1:
+                # Note que aqui não salvamos em df_sub/df_carga pois não faremos analise de desequilibrio com potência
+                carregar_e_plotar(
+                    "Potências Subestação", 
+                    MAPA_ARQUIVOS["Potências Subestação"], 
+                    "sub_pot"
+                )
+            
+            with tab2:
+                carregar_e_plotar(
+                    "Potências Carga D", 
+                    MAPA_ARQUIVOS["Potências Carga D"], 
+                    "carga_d_pot"
+                )
+                
+            with tab3:
+                carregar_e_plotar(
+                    "Potências Carga C", 
+                    MAPA_ARQUIVOS["Potências Carga C"], 
+                    "carga_c_pot"
+                )
+
+        # -----------------------------------------------------
+        # ANÁLISE DE DESEQUILÍBRIO
+        # -----------------------------------------------------
+        # Só executamos se estivermos no modo Tensão e se os dados foram carregados
+        if tipo_variavel == "Tensão, corrente e ângulo":
+            if df_sub is not None and df_carga is not None:
+                render_analise_desequilibrio(df_sub, df_carga)
+            else:
+                st.warning("Aguardando carregamento dos dados para análise de desequilíbrio...")
 
     # ROTA 2: ANÁLISE 3D (Totalmente isolada)
     elif pagina == "Topologia (3D)":
