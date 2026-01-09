@@ -69,7 +69,7 @@ def render_cabecalho():
     st.markdown("---") # Uma linha divisória
     st.markdown("### Topologia do Sistema Analisado")
     st.image(
-        "https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Diagrama%20SEP%20cargac.jpg", 
+        "https://raw.githubusercontent.com/grei-ufc/tsdq-dataview-opentes/main/imagens/Diagrama%20SEP%20FINAL.jpg", 
         caption="Diagrama Unifilar Simplificado",
         use_container_width=True
     )
@@ -107,6 +107,32 @@ MAPA_ARQUIVOS = {
         "path": "Exemplos/Daily/Equivalente_Mon_potenciacargac_1*.csv"
     }
 }
+
+# ============================================================================
+# CONFIGURAÇÃO DA TOPOLOGIA (ORDEM DO CIRCUITO: A -> B -> C -> D)
+# ============================================================================
+TOPOLOGIA_SISTEMA = [
+    {
+        "nome": "Barra A (138 kV)", 
+        "arquivo_vi": "Tensão e Corrente Subestação",
+        "arquivo_pq": "Potências Subestação"
+    },
+    {
+        "nome": "Barra B (13.8 kV)", 
+        "arquivo_vi": "Tensão e Corrente Subestação (Baixa)",
+        "arquivo_pq": "Potências Subestação (Baixa)"
+    },
+    {
+        "nome": "Barra C (Ramal)",   
+        "arquivo_vi": "Tensão e Corrente Carga C",
+        "arquivo_pq": "Potências Carga C"
+    },
+    {
+        "nome": "Barra D (Ponta)",   
+        "arquivo_vi": "Tensão e Corrente Carga D",
+        "arquivo_pq": "Potências Carga D"
+    }
+]
 
 # ============================================================================
 # MAPA DE LEGENDAS (Tradução de V1 -> Fase A)
@@ -743,6 +769,170 @@ def render_analise_desequilibrio(df_sub, df_carga):
             """)
 
 # ============================================================================
+# NOVA FUNÇÃO: ANÁLISE TOPOLÓGICA 3D (A -> B -> C -> D)
+# ============================================================================
+def render_topologia_comparativa():
+    st.markdown("## Análise das Barras")
+
+    # ---------------------------------------------------------
+    # 1. CONTROLES DO USUÁRIO
+    # ---------------------------------------------------------
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        # Opções de Grandeza
+        opcoes_grandezas = {
+            "VA (Tensão Fase A)":        {"col": "V1", "tipo": "VI", "unidade": "Tensão (kV ou pu)"},
+            "VB (Tensão Fase B)":        {"col": "V2", "tipo": "VI", "unidade": "Tensão (kV ou pu)"},
+            "VC (Tensão Fase C)":        {"col": "V3", "tipo": "VI", "unidade": "Tensão (kV ou pu)"},
+            "IA (Corrente Fase A)":      {"col": "I1", "tipo": "VI", "unidade": "Corrente (A)"},
+            "IB (Corrente Fase B)":      {"col": "I2", "tipo": "VI", "unidade": "Corrente (A)"},
+            "IC (Corrente Fase C)":      {"col": "I3", "tipo": "VI", "unidade": "Corrente (A)"},
+            "PA (Potência Ativa A)":     {"col": "P1", "tipo": "PQ", "unidade": "Potência Ativa (kW)"},
+            "PB (Potência Ativa B)":     {"col": "P2", "tipo": "PQ", "unidade": "Potência Ativa (kW)"},
+            "PC (Potência Ativa C)":     {"col": "P3", "tipo": "PQ", "unidade": "Potência Ativa (kW)"},
+            "QA (Potência Reativa A)":   {"col": "Q1", "tipo": "PQ", "unidade": "Potência Reativa (kvar)"},
+            "QB (Potência Reativa B)":   {"col": "Q2", "tipo": "PQ", "unidade": "Potência Reativa (kvar)"},
+            "QC (Potência Reativa C)":   {"col": "Q3", "tipo": "PQ", "unidade": "Potência Reativa (kvar)"},
+        }
+        escolha_usuario = st.selectbox("Grandeza a analisar:", list(opcoes_grandezas.keys()))
+
+    with col2:
+        # Seletor de Barras (Multiselect)
+        # Extrai apenas os nomes para exibir no widget
+        nomes_disponiveis = [item["nome"] for item in TOPOLOGIA_SISTEMA]
+        
+        selecao_barras = st.multiselect(
+            "Selecione as Barras para visualizar:",
+            options=nomes_disponiveis,
+            default=nomes_disponiveis, # Começa com todas selecionadas
+            placeholder="Escolha pelo menos uma barra..."
+        )
+
+    # Verifica se o usuário desmarcou tudo
+    if not selecao_barras:
+        st.warning("⚠️ Por favor, selecione pelo menos uma barra para gerar o gráfico.")
+        return
+
+    # Recupera configurações da escolha
+    config = opcoes_grandezas[escolha_usuario]
+    coluna_alvo = config["col"]
+    tipo_dado = config["tipo"]
+    unidade_z = config["unidade"]
+
+    # ---------------------------------------------------------
+    # 2. PROCESSAMENTO E FILTRAGEM
+    # ---------------------------------------------------------
+    dados_z = []      
+    nomes_eixo_y = [] 
+    eixo_x = None     
+    
+    progresso = st.progress(0, text="Processando dados...")
+
+    # LOGICA DE FILTRAGEM PRESERVANDO A ORDEM:
+    # Iteramos sobre a lista ORIGINAL (TOPOLOGIA_SISTEMA) e checamos se está na seleção.
+    # Isso garante que Barra A sempre venha antes de B, que vem antes de C, etc.
+    barras_filtradas = [b for b in TOPOLOGIA_SISTEMA if b["nome"] in selecao_barras]
+    
+    total_steps = len(barras_filtradas)
+
+    for i, item in enumerate(barras_filtradas):
+        nome_barra = item["nome"]
+        
+        # Seleciona arquivo
+        if tipo_dado == "VI":
+            chave_mapa = item["arquivo_vi"]
+        else:
+            chave_mapa = item["arquivo_pq"]
+
+        caminho = MAPA_ARQUIVOS[chave_mapa]["path"]
+        df = carregar_dados(caminho)
+        
+        if df is not None:
+            # Pega tempo
+            if eixo_x is None:
+                col_tempo = next((c for c in df.columns if c.lower() in ["hour", "time"]), df.columns[0])
+                eixo_x = df[col_tempo].values
+
+            # Verifica coluna
+            if coluna_alvo in df.columns:
+                dados_z.append(df[coluna_alvo].values)
+            else:
+                dados_z.append(np.zeros(len(df)))
+                # Aviso inteligente: só avisa se for realmente relevante
+                if "Carga" in nome_barra and "2" in coluna_alvo: 
+                    pass # Ignora aviso de fase faltante em carga monofásica para não poluir
+                else:
+                    st.toast(f"Nota: {nome_barra} plotado como 0 (sem dados de {coluna_alvo}).")
+            
+            nomes_eixo_y.append(nome_barra)
+        
+        # Atualiza progresso com segurança (evita divisão por zero)
+        progresso.progress((i + 1) / total_steps)
+
+    progresso.empty()
+
+    if not dados_z:
+        st.error("Erro: Nenhum dado carregado.")
+        return
+
+    # ---------------------------------------------------------
+    # 3. PLOTAGEM 3D
+    # ---------------------------------------------------------
+    Z = np.array(dados_z)
+    Y_indices = np.arange(len(nomes_eixo_y))
+    X, Y = np.meshgrid(eixo_x, Y_indices)
+
+    fig = go.Figure()
+
+    # Define paleta
+    if "Tensão" in unidade_z:
+        cor_escala = 'Viridis'
+    elif "Corrente" in unidade_z:
+        cor_escala = 'Plasma'
+    else:
+        cor_escala = 'Inferno' 
+
+    # Superfície
+    fig.add_trace(go.Surface(
+        z=Z, x=X, y=Y,
+        colorscale=cor_escala,
+        colorbar=dict(title=coluna_alvo),
+        opacity=0.9
+    ))
+
+    # Linhas de destaque
+    for i, nome in enumerate(nomes_eixo_y):
+        fig.add_trace(go.Scatter3d(
+            x=eixo_x,
+            y=[i] * len(eixo_x),
+            z=Z[i],
+            mode='lines',
+            line=dict(width=5, color='white'),
+            name=nome,
+            showlegend=False
+        ))
+
+    fig.update_layout(
+        title=f"Topologia ({len(nomes_eixo_y)} barras): {escolha_usuario}",
+        scene=dict(
+            xaxis_title="Tempo (h)",
+            yaxis=dict(
+                title="Localização",
+                tickvals=Y_indices,
+                ticktext=nomes_eixo_y # Usa a lista dinâmica de nomes filtrados
+            ),
+            zaxis_title=unidade_z,
+            aspectmode="manual",
+            aspectratio=dict(x=1, y=1.2, z=0.7)
+        ),
+        height=700,
+        margin=dict(l=0, r=0, b=0, t=40)
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================================
 # 9. FUNÇÃO PRINCIPAL DO APLICATIVO
 # ============================================================================
 def main():
@@ -767,13 +957,12 @@ def main():
         st.header("Navegação")
         pagina = st.radio(
             "Ir para:",
-            ["Análise Linear (2D)", "Topologia (3D)"]
+            ["Análise Linear (2D)", "Análise de Barras (3D)", "Topologia (3D)"]
         )
         st.divider()
 
     render_cabecalho()
 
-   # ROTA 1: ANÁLISE 2D
     # ROTA 1: ANÁLISE 2D
     if pagina == "Análise Linear (2D)":
         st.subheader("Análise Linear e Desequilíbrio", divider="green")
@@ -886,7 +1075,11 @@ def main():
             else:
                 st.warning("Aguardando carregamento dos dados para análise de desequilíbrio...")
 
-    # ROTA 2: ANÁLISE 3D (Totalmente isolada)
+    # ROTA 2: ANÁLISE DE BARRAS (A NOVA FUNÇÃO)
+    elif pagina == "Análise de Barras (3D)":
+        render_topologia_comparativa()
+
+    # ROTA 3: ANÁLISE 3D (Totalmente isolada)
     elif pagina == "Topologia (3D)":
         render_visualizacao_3d_independente()
 
