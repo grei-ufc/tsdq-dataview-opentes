@@ -115,22 +115,26 @@ TOPOLOGIA_SISTEMA = [
     {
         "nome": "Barra A (138 kV)", 
         "arquivo_vi": "Tensão e Corrente Subestação",
-        "arquivo_pq": "Potências Subestação"
+        "arquivo_pq": "Potências Subestação",
+        "kv_base": 138.0  # Tensão nominal desta barra
     },
     {
         "nome": "Barra B (13.8 kV)", 
         "arquivo_vi": "Tensão e Corrente Subestação (Baixa)",
-        "arquivo_pq": "Potências Subestação (Baixa)"
+        "arquivo_pq": "Potências Subestação (Baixa)",
+        "kv_base": 13.8   # Tensão nominal após o trafo
     },
     {
         "nome": "Barra C (Ramal)",   
         "arquivo_vi": "Tensão e Corrente Carga C",
-        "arquivo_pq": "Potências Carga C"
+        "arquivo_pq": "Potências Carga C",
+        "kv_base": 13.8   # Continua sendo 13.8 kV
     },
     {
         "nome": "Barra D (Ponta)",   
         "arquivo_vi": "Tensão e Corrente Carga D",
-        "arquivo_pq": "Potências Carga D"
+        "arquivo_pq": "Potências Carga D",
+        "kv_base": 13.8   # Continua sendo 13.8 kV
     }
 ]
 
@@ -774,110 +778,134 @@ def render_analise_desequilibrio(df_sub, df_carga):
 def render_topologia_comparativa():
     st.markdown("## Análise das Barras")
 
-    # ---------------------------------------------------------
+   # ---------------------------------------------------------
     # 1. CONTROLES DO USUÁRIO
     # ---------------------------------------------------------
-    col1, col2 = st.columns([1, 1])
+    col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
-        # Opções de Grandeza
         opcoes_grandezas = {
-            "VA (Tensão Fase A)":        {"col": "V1", "tipo": "VI", "unidade": "Tensão (kV ou pu)"},
-            "VB (Tensão Fase B)":        {"col": "V2", "tipo": "VI", "unidade": "Tensão (kV ou pu)"},
-            "VC (Tensão Fase C)":        {"col": "V3", "tipo": "VI", "unidade": "Tensão (kV ou pu)"},
-            "IA (Corrente Fase A)":      {"col": "I1", "tipo": "VI", "unidade": "Corrente (A)"},
-            "IB (Corrente Fase B)":      {"col": "I2", "tipo": "VI", "unidade": "Corrente (A)"},
-            "IC (Corrente Fase C)":      {"col": "I3", "tipo": "VI", "unidade": "Corrente (A)"},
-            "PA (Potência Ativa A)":     {"col": "P1", "tipo": "PQ", "unidade": "Potência Ativa (kW)"},
-            "PB (Potência Ativa B)":     {"col": "P2", "tipo": "PQ", "unidade": "Potência Ativa (kW)"},
-            "PC (Potência Ativa C)":     {"col": "P3", "tipo": "PQ", "unidade": "Potência Ativa (kW)"},
-            "QA (Potência Reativa A)":   {"col": "Q1", "tipo": "PQ", "unidade": "Potência Reativa (kvar)"},
-            "QB (Potência Reativa B)":   {"col": "Q2", "tipo": "PQ", "unidade": "Potência Reativa (kvar)"},
-            "QC (Potência Reativa C)":   {"col": "Q3", "tipo": "PQ", "unidade": "Potência Reativa (kvar)"},
+            "VA (Tensão Fase A)":        {"col": "V1", "tipo": "VI", "unidade": "Tensão"},
+            "VB (Tensão Fase B)":        {"col": "V2", "tipo": "VI", "unidade": "Tensão"},
+            "VC (Tensão Fase C)":        {"col": "V3", "tipo": "VI", "unidade": "Tensão"},
+            "IA (Corrente Fase A)":      {"col": "I1", "tipo": "VI", "unidade": "Corrente"},
+            "IB (Corrente Fase B)":      {"col": "I2", "tipo": "VI", "unidade": "Corrente"},
+            "IC (Corrente Fase C)":      {"col": "I3", "tipo": "VI", "unidade": "Corrente"},
+            "PA (Potência Ativa A)":     {"col": "P1", "tipo": "PQ", "unidade": "Potência Ativa"},
+            "PB (Potência Ativa B)":     {"col": "P2", "tipo": "PQ", "unidade": "Potência Ativa"},
+            "PC (Potência Ativa C)":     {"col": "P3", "tipo": "PQ", "unidade": "Potência Ativa"},
         }
-        escolha_usuario = st.selectbox("Grandeza a analisar:", list(opcoes_grandezas.keys()))
+        escolha_usuario = st.selectbox("Grandeza:", list(opcoes_grandezas.keys()))
 
     with col2:
-        # Seletor de Barras (Multiselect)
-        # Extrai apenas os nomes para exibir no widget
         nomes_disponiveis = [item["nome"] for item in TOPOLOGIA_SISTEMA]
-        
         selecao_barras = st.multiselect(
-            "Selecione as Barras para visualizar:",
+            "Barras:",
             options=nomes_disponiveis,
-            default=nomes_disponiveis, # Começa com todas selecionadas
-            placeholder="Escolha pelo menos uma barra..."
+            default=nomes_disponiveis
         )
 
-    # Verifica se o usuário desmarcou tudo
+    with col3:
+        st.write("**Configuração PU**")
+        usar_pu = st.checkbox("Visualizar em PU", value=False)
+        
+        # Se for corrente ou potência, precisamos da Base de Potência (Sbase)
+        s_base_mva = 10.0 # Valor padrão
+        if usar_pu:
+            s_base_mva = st.number_input("Sbase (MVA):", value=10.0, step=1.0)
+
     if not selecao_barras:
-        st.warning("⚠️ Por favor, selecione pelo menos uma barra para gerar o gráfico.")
+        st.warning("Selecione ao menos uma barra.")
         return
 
-    # Recupera configurações da escolha
+    # Recupera configurações
     config = opcoes_grandezas[escolha_usuario]
     coluna_alvo = config["col"]
     tipo_dado = config["tipo"]
-    unidade_z = config["unidade"]
+    classe_grandeza = config["unidade"] # Tensão, Corrente ou Potência
+
+    # Ajusta o rótulo da unidade (Eixo Z)
+    if usar_pu:
+        unidade_z = "Magnitude (pu)"
+    else:
+        # Define unidades físicas originais
+        if "Tensão" in classe_grandeza: unidade_z = "Tensão (kV)"
+        elif "Corrente" in classe_grandeza: unidade_z = "Corrente (A)"
+        else: unidade_z = "Potência (kW)"
 
     # ---------------------------------------------------------
-    # 2. PROCESSAMENTO E FILTRAGEM
+    # 2. PROCESSAMENTO E CÁLCULO DE PU
     # ---------------------------------------------------------
     dados_z = []      
     nomes_eixo_y = [] 
     eixo_x = None     
     
-    progresso = st.progress(0, text="Processando dados...")
-
-    # LOGICA DE FILTRAGEM PRESERVANDO A ORDEM:
-    # Iteramos sobre a lista ORIGINAL (TOPOLOGIA_SISTEMA) e checamos se está na seleção.
-    # Isso garante que Barra A sempre venha antes de B, que vem antes de C, etc.
     barras_filtradas = [b for b in TOPOLOGIA_SISTEMA if b["nome"] in selecao_barras]
     
-    total_steps = len(barras_filtradas)
+    progresso = st.progress(0, text="Calculando bases e lendo dados...")
 
     for i, item in enumerate(barras_filtradas):
         nome_barra = item["nome"]
+        kv_base_barra = item["kv_base"] # Ex: 138 ou 13.8
         
         # Seleciona arquivo
-        if tipo_dado == "VI":
-            chave_mapa = item["arquivo_vi"]
-        else:
-            chave_mapa = item["arquivo_pq"]
-
+        chave_mapa = item["arquivo_vi"] if tipo_dado == "VI" else item["arquivo_pq"]
         caminho = MAPA_ARQUIVOS[chave_mapa]["path"]
         df = carregar_dados(caminho)
         
         if df is not None:
-            # Pega tempo
             if eixo_x is None:
                 col_tempo = next((c for c in df.columns if c.lower() in ["hour", "time"]), df.columns[0])
                 eixo_x = df[col_tempo].values
 
-            # Verifica coluna
+            # Extrai valor bruto
+            valor_bruto = np.zeros(len(df))
             if coluna_alvo in df.columns:
-                dados_z.append(df[coluna_alvo].values)
-            else:
-                dados_z.append(np.zeros(len(df)))
-                # Aviso inteligente: só avisa se for realmente relevante
-                if "Carga" in nome_barra and "2" in coluna_alvo: 
-                    pass # Ignora aviso de fase faltante em carga monofásica para não poluir
-                else:
-                    st.toast(f"Nota: {nome_barra} plotado como 0 (sem dados de {coluna_alvo}).")
+                valor_bruto = df[coluna_alvo].values
             
+            # --- CÁLCULO DO PU ---
+            valor_final = valor_bruto
+            
+            if usar_pu:
+                # 1. Tensão (Vpu = V_lida / Vbase_fase_neutro)
+                # O OpenDSS exporta monitores em VOLTS.
+                # A base definida no topo está em kV.
+                # Correção: Multiplicamos a base kV por 1000 para virar Volts.
+                v_base_volts = (kv_base_barra * 1000) / 1.73205
+                
+                if "Tensão" in classe_grandeza:
+                    valor_final = valor_bruto / v_base_volts
+                
+                # 2. Corrente (Ipu = I / Ibase)
+                # Ibase = Sbase / (sqrt(3) * Vbase)
+                # Aqui Sbase entra em kVA e Vbase em kV, ou MVA e kV...
+                # Vamos padronizar tudo para Unidades Básicas (Volts, Amperes, VA)
+                elif "Corrente" in classe_grandeza:
+                    s_base_va = s_base_mva * 1_000_000 # MVA para VA
+                    v_base_linha_volts = kv_base_barra * 1000 # kV para Volts
+                    
+                    i_base = s_base_va / (1.73205 * v_base_linha_volts)
+                    valor_final = valor_bruto / i_base
+                
+                # 3. Potência (Ppu = P_kW / Sbase_kVA)
+                # O arquivo vem em kW. Precisamos da base em kW (kVA).
+                elif "Potência" in classe_grandeza:
+                    s_base_kva = s_base_mva * 1000 # MVA para kVA
+                    valor_final = valor_bruto / s_base_kva
+
+            dados_z.append(valor_final)
             nomes_eixo_y.append(nome_barra)
         
-        # Atualiza progresso com segurança (evita divisão por zero)
-        progresso.progress((i + 1) / total_steps)
+        progresso.progress((i + 1) / len(barras_filtradas))
 
     progresso.empty()
 
     if not dados_z:
-        st.error("Erro: Nenhum dado carregado.")
+        st.error("Erro nos dados.")
         return
 
     # ---------------------------------------------------------
-    # 3. PLOTAGEM 3D
+    # 3. PLOTAGEM
     # ---------------------------------------------------------
     Z = np.array(dados_z)
     Y_indices = np.arange(len(nomes_eixo_y))
@@ -885,19 +913,16 @@ def render_topologia_comparativa():
 
     fig = go.Figure()
 
-    # Define paleta
-    if "Tensão" in unidade_z:
-        cor_escala = 'Viridis'
-    elif "Corrente" in unidade_z:
-        cor_escala = 'Plasma'
-    else:
-        cor_escala = 'Inferno' 
+    # Cores
+    if "Tensão" in classe_grandeza: cmap = 'Viridis'
+    elif "Corrente" in classe_grandeza: cmap = 'Plasma'
+    else: cmap = 'Inferno'
 
     # Superfície
     fig.add_trace(go.Surface(
         z=Z, x=X, y=Y,
-        colorscale=cor_escala,
-        colorbar=dict(title=coluna_alvo),
+        colorscale=cmap,
+        colorbar=dict(title=unidade_z),
         opacity=0.9
     ))
 
@@ -908,19 +933,24 @@ def render_topologia_comparativa():
             y=[i] * len(eixo_x),
             z=Z[i],
             mode='lines',
-            line=dict(width=5, color='white'),
+            line=dict(width=5, color='red'),
             name=nome,
             showlegend=False
         ))
+    
+    # Adiciona um plano de referência em 1.0 pu se estiver em modo PU
+    if usar_pu and "Tensão" in classe_grandeza:
+        # Plano transparente em z=1
+        pass # (Opcional, pode poluir o gráfico, deixei de fora por enquanto)
 
     fig.update_layout(
-        title=f"Topologia ({len(nomes_eixo_y)} barras): {escolha_usuario}",
+        title=f"Topologia: {escolha_usuario} ({'PU' if usar_pu else 'Físico'})",
         scene=dict(
             xaxis_title="Tempo (h)",
             yaxis=dict(
                 title="Localização",
                 tickvals=Y_indices,
-                ticktext=nomes_eixo_y # Usa a lista dinâmica de nomes filtrados
+                ticktext=nomes_eixo_y
             ),
             zaxis_title=unidade_z,
             aspectmode="manual",
