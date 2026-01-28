@@ -1,0 +1,30 @@
+{
+    "nome_cenario": "Simulação Laboratório GREI",
+    "pasta_arquivos": "Exemplos/Daily",
+    "elementos": [
+        {
+            "nome": "Barra A (Subestação)",
+            "arquivo": "Equivalente_Mon_tensaosub_1.csv",
+            "kv_base": 138.0,
+            "tipo": "fonte"
+        },
+        {
+            "nome": "Barra B (Secundário)",
+            "arquivo": "Equivalente_Mon_tensaosubbaixa_1.csv",
+            "kv_base": 13.8,
+            "tipo": "trafo"
+        },
+        {
+            "nome": "Barra C (Ramal)",
+            "arquivo": "Equivalente_Mon_tensaocargac_1.csv",
+            "kv_base": 13.8,
+            "tipo": "carga"
+        },
+        {
+            "nome": "Barra D (Ponta)",
+            "arquivo": "Equivalente_Mon_tensaocargad_1.csv",
+            "kv_base": 13.8,
+            "tipo": "carga"
+        }
+    ]
+}

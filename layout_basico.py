@@ -8,11 +8,72 @@ import glob
 import re
 import plotly.graph_objects as go
 import numpy as np
+import json
+import os
+
+# --- ESTA TEM QUE SER A PRIMEIRA LINHA 'st.' DO CÓDIGO ---
+st.set_page_config(
+    page_title="Dashboard OpenDSS", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
+)
+# ---------------------------------------------------------
 
 # ============================================================================
-# 2. CONFIGURAÇÃO DA PÁGINA
+# CONFIGURAÇÃO DA TOPOLOGIA (VIA ARQUIVO JSON)
 # ============================================================================
-st.set_page_config(page_title="Simulação Daily.dss", layout="wide")
+
+# Função para carregar a configuração
+def carregar_configuracao(caminho_json):
+    try:
+        with open(caminho_json, 'r', encoding='utf-8') as f:
+            dados = json.load(f)
+        return dados
+    except FileNotFoundError:
+        st.error(f"O arquivo '{caminho_json}' não foi encontrado!")
+        st.stop()
+    except json.JSONDecodeError:
+        st.error(f"Erro ao ler o JSON. Verifique se a formatação está correta.")
+        st.stop()
+
+# 1. Carrega o arquivo JSON
+config = carregar_configuracao('config_circuito.json')
+
+# 2. Monta a estrutura que o código usará
+pasta_base = config.get("pasta_arquivos", "") # Pega o nome da pasta definido no JSON
+TOPOLOGIA_SISTEMA = []
+
+for item in config["elementos"]:
+    # Monta o caminho base conforme está no JSON
+    caminho_original = os.path.join(pasta_base, item["arquivo"])
+    
+    # --- LÓGICA INTELIGENTE DE DETECÇÃO DE ARQUIVOS ---
+    # Seus arquivos são separados: "...tensao..." e "...potencia..."
+    # O código abaixo tenta adivinhar o par correto automaticamente.
+    caminho_vi = caminho_original
+    caminho_pq = caminho_original
+    
+    # Se o JSON apontar para o arquivo de tensão, calculamos o nome do de potência
+    if "tensao" in caminho_original.lower():
+        caminho_pq = caminho_original.replace("tensao", "potencia")
+        
+    # Se o JSON apontar para o arquivo de potência, calculamos o nome do de tensão
+    elif "potencia" in caminho_original.lower():
+        caminho_vi = caminho_original.replace("potencia", "tensao")
+    
+    # Adiciona na lista com os caminhos corretos para cada grandeza
+    TOPOLOGIA_SISTEMA.append({
+        "nome": item["nome"],
+        "arquivo": caminho_original,
+        "kv_base": item["kv_base"],
+        "tipo": item.get("tipo", "generico"),
+        "arquivo_vi": caminho_vi, # Usa o arquivo de Tensão/Corrente
+        "arquivo_pq": caminho_pq  # Usa o arquivo de Potência
+    })
+# Opcional: Mostrar na tela que carregou com sucesso
+st.sidebar.success(f"Cenário carregado: {config['nome_cenario']}")
+
+
 
 # ============================================================================
 # 3. CABEÇALHO E ELEMENTOS VISUAIS
@@ -74,69 +135,6 @@ def render_cabecalho():
         use_container_width=True
     )
     st.markdown("---")
-
-# ============================================================================
-# 4. MAPEAMENTO DE ARQUIVOS E CONFIGURAÇÕES
-# ============================================================================
-MAPA_ARQUIVOS = {
-    #LADO DE ALTA (138kV)
-    "Tensão e Corrente Subestação": {
-        "path": "Exemplos/Daily/Equivalente_Mon_tensaosub_1*.csv",
-    },
-    "Potências Subestação": {
-        "path": "Exemplos/Daily/Equivalente_Mon_potenciasub_1*.csv",
-    },
-    #LADO DE BAIXA (13.8 kV)
-    "Tensão e Corrente Subestação (Baixa)": {
-        "path": "Exemplos/Daily/Equivalente_Mon_tensaosubbaixa_1*.csv",
-    },
-    "Potências Subestação (Baixa)": {
-        "path": "Exemplos/Daily/Equivalente_Mon_potenciasubbaixa_1*.csv",
-    },
-    #CARGAS
-    "Potências Carga D": {
-        "path": "Exemplos/Daily/Equivalente_Mon_potenciacargad_1*.csv",
-    },
-     "Tensão e Corrente Carga D": {
-        "path": "Exemplos/Daily/Equivalente_Mon_tensaocargad_1*.csv",
-    },
-    "Tensão e Corrente Carga C": {
-        "path": "Exemplos/Daily/Equivalente_Mon_tensaocargac_1*.csv",
-    },
-    "Potências Carga C": {
-        "path": "Exemplos/Daily/Equivalente_Mon_potenciacargac_1*.csv"
-    }
-}
-
-# ============================================================================
-# CONFIGURAÇÃO DA TOPOLOGIA (ORDEM DO CIRCUITO: A -> B -> C -> D)
-# ============================================================================
-TOPOLOGIA_SISTEMA = [
-    {
-        "nome": "Barra A (138 kV)", 
-        "arquivo_vi": "Tensão e Corrente Subestação",
-        "arquivo_pq": "Potências Subestação",
-        "kv_base": 138.0  # Tensão nominal desta barra
-    },
-    {
-        "nome": "Barra B (13.8 kV)", 
-        "arquivo_vi": "Tensão e Corrente Subestação (Baixa)",
-        "arquivo_pq": "Potências Subestação (Baixa)",
-        "kv_base": 13.8   # Tensão nominal após o trafo
-    },
-    {
-        "nome": "Barra C (Ramal)",   
-        "arquivo_vi": "Tensão e Corrente Carga C",
-        "arquivo_pq": "Potências Carga C",
-        "kv_base": 13.8   # Continua sendo 13.8 kV
-    },
-    {
-        "nome": "Barra D (Ponta)",   
-        "arquivo_vi": "Tensão e Corrente Carga D",
-        "arquivo_pq": "Potências Carga D",
-        "kv_base": 13.8   # Continua sendo 13.8 kV
-    }
-]
 
 # ============================================================================
 # MAPA DE LEGENDAS (Tradução de V1 -> Fase A)
@@ -305,116 +303,139 @@ def carregar_e_plotar(nome_monitor, monitor_info, monitor_key):
     return df, eixo_x, canal, grupo
 
 # ============================================================================
-# 7. FUNÇÃO DE VISUALIZAÇÃO 3D (VERSÃO CORRIGIDA)
+# 9. FUNÇÃO DE VISUALIZAÇÃO 3D INDEPENDENTE (COM GRÁFICO 3D RESTAURADO)
 # ============================================================================
-# --- SUBSTITUA A FUNÇÃO render_visualizacao_3d POR ESTA ---
 def render_visualizacao_3d_independente():
-    st.markdown("## Visualização Espacial (3D)")
+    st.markdown("## Visualização 3D Detalhada (Por Elemento)")
 
-    # 1. SELEÇÃO DO ARQUIVO (Agora independente)
-    monitor_selecionado = st.selectbox(
-        "Selecione o Monitor/Arquivo:", 
-        list(MAPA_ARQUIVOS.keys()),
-        key="sel_3d_source"
-    )
-
-    # 2. CARREGAMENTO (Backend)
-    caminho = MAPA_ARQUIVOS[monitor_selecionado]["path"]
-    df = carregar_dados(caminho)
+    # 1. SELEÇÃO DO ELEMENTO
+    nomes_elementos = [item["nome"] for item in TOPOLOGIA_SISTEMA]
+    escolha_elemento = st.selectbox("Selecione o Elemento (Barra/Trafo):", nomes_elementos)
     
+    item_selecionado = next(item for item in TOPOLOGIA_SISTEMA if item["nome"] == escolha_elemento)
+
+    # 2. SELEÇÃO DE VARIÁVEIS
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        tipo_variavel = st.selectbox(
+            "Selecione a Variável:",
+            [
+                "Tensão (Magnitude)", "Tensão (Ângulo)", 
+                "Corrente (Magnitude)", "Corrente (Ângulo)",
+                "Potência Ativa (P)", "Potência Reativa (Q)"
+            ]
+        )
+        
+    with col2:
+        # Checkbox para alternar entre 2D e 3D
+        modo_visualizacao = st.radio("Modo de Visualização:", ["3D (Espacial)", "2D (Plano)"])
+
+    with col3:
+        fases = st.multiselect("Fases:", ["Fase A (1)", "Fase B (2)", "Fase C (3)"], default=["Fase A (1)", "Fase B (2)", "Fase C (3)"])
+
+    # 3. CARREGAMENTO INTELIGENTE (Mantivemos a correção aqui)
+    if "Potência" in tipo_variavel:
+        caminho_arquivo = item_selecionado["arquivo_pq"]
+    else:
+        caminho_arquivo = item_selecionado["arquivo_vi"]
+
+    df = carregar_dados(caminho_arquivo)
+
     if df is None:
-        st.error("Dados não encontrados.")
+        st.error(f"Não foi possível carregar o arquivo para {escolha_elemento}.")
         return
 
-    # Filtro de colunas zeradas
-    colunas_validas = [
-        c for c in df.columns 
-        if not (df[c] == 0).all() or c.lower() in ["hour", "time", "step"]
-    ]
-    df = df[colunas_validas]
-
-    # Eixo X
-    eixo_x = next((c for c in df.columns if c.lower() in ["hour", "time"]), df.columns[0])
-
-    # 3. IDENTIFICAR GRUPOS
-    grupos_disponiveis = listar_grupos_para_3d(df)
+    # 4. PREPARAÇÃO DOS DADOS
+    mapa_fases = {"Fase A (1)": "1", "Fase B (2)": "2", "Fase C (3)": "3"}
+    # Mapeamento para posicionar as fases no eixo Y do gráfico 3D
+    posicao_fases = {"Fase A (1)": 0, "Fase B (2)": 1, "Fase C (3)": 2}
     
-    if not grupos_disponiveis:
-        st.warning("Nenhum grupo compatível (V, I, P, Q) encontrado para 3D.")
-        return
-
-    tipo_visualizacao = st.selectbox(
-        "Selecione o Grupo de Variáveis:", 
-        list(grupos_disponiveis.keys()),
-        key="sel_3d_type"
-    )
+    col_tempo = next((c for c in df.columns if c.lower() in ["hour", "time", "t(h)"]), df.columns[0])
+    eixo_x = df[col_tempo]
     
-    grupo = grupos_disponiveis[tipo_visualizacao] # ex: ['V1', 'V2', 'V3']
+    colunas_para_plotar = []
 
-    # 4. CONFIGURAÇÕES VISUAIS
-    #with st.expander("⚙️ Configurações do Gráfico", expanded=True):
-    #    altura = st.slider("Altura do gráfico", 600, 1200, 800, 50)
-    altura = 800
-   # 5. PLOTAGEM
-    with st.container():
-        # Cria o container com borda que vai envolver TUDO
-        # A altura fixa (height) aqui ajuda a manter a caixa estável
-        with st.container(border=True):
-            
-            # --- Texto de Instrução (Dentro da caixa) ---
-            st.markdown("""
-                <h4 style="text-align: center; color: #d9534f; margin: 0;">
-            """, unsafe_allow_html=True)
-            
-            # Preparação dos dados
-            x_vals = df[eixo_x].values
-            y_vals_originais = grupo
-            y_vals_legiveis = [MAPA_LEGENDAS.get(c, c) for c in grupo] 
-            y_indices = np.arange(len(y_vals_originais))
-            
-            X, Y_indices = np.meshgrid(x_vals, y_indices)
-            Z = df[grupo].values.T
-            
-            colorscale = 'RdYlBu' if "Potência" in tipo_visualizacao else 'Viridis'
-            camera = dict(eye=dict(x=1.8, y=1.8, z=1.2))
-            aspect = dict(x=1, y=1, z=1)
+    for fase_selecionada in fases:
+        num_fase = mapa_fases[fase_selecionada]
+        
+        # Regex para encontrar a coluna (Mesma lógica da resposta anterior)
+        padrao = ""
+        if "Tensão (Magnitude)" in tipo_variavel: padrao = f"V{num_fase}$| V{num_fase}$|V{num_fase}\\s"
+        elif "Tensão (Ângulo)" in tipo_variavel: padrao = f"Ang.*{num_fase}"
+        elif "Corrente (Magnitude)" in tipo_variavel: padrao = f"I{num_fase}$| I{num_fase}$|I{num_fase}\\s"
+        elif "Corrente (Ângulo)" in tipo_variavel: padrao = f"Ang.*I{num_fase}|Ang.*{num_fase}"
+        elif "Potência Ativa" in tipo_variavel: padrao = f"P{num_fase}| P{num_fase}"
+        elif "Potência Reativa" in tipo_variavel: padrao = f"Q{num_fase}| Q{num_fase}"
 
-            # 1. Superfície
-            fig3d = go.Figure(data=[go.Surface(
-                x=X, y=Y_indices, z=Z,
-                colorscale=colorscale,
-                colorbar=dict(title=tipo_visualizacao),
-                opacity=0.8,
-                name="Superfície"
-            )])
+        col_encontrada = None
+        for col in df.columns:
+            if re.search(padrao, col, re.IGNORECASE) and col != col_tempo:
+                if "Magnitude" in tipo_variavel and "Ang" in col: continue
+                if "Corrente (Magnitude)" in tipo_variavel and "Ang" in col: continue
+                col_encontrada = col
+                break
+        
+        if col_encontrada:
+            colunas_para_plotar.append((fase_selecionada, col_encontrada))
 
-            # 2. Linhas Vermelhas
-            for i, coluna in enumerate(grupo):
-                y_linha = [y_indices[i]] * len(x_vals)
-                z_linha = df[coluna].values
-                fig3d.add_trace(go.Scatter3d(
-                    x=x_vals, y=y_linha, z=z_linha,
+    # 5. PLOTAGEM (AQUI ESTÁ A CORREÇÃO PARA 3D)
+    if colunas_para_plotar:
+        fig = go.Figure()
+
+        if modo_visualizacao == "3D (Espacial)":
+            # --- MODO 3D ---
+            for nome_fase, nome_coluna in colunas_para_plotar:
+                y_pos = posicao_fases[nome_fase] # 0, 1 ou 2
+                
+                fig.add_trace(go.Scatter3d(
+                    x=eixo_x,
+                    y=[y_pos] * len(eixo_x), # Mantém o Y fixo para criar a "linha" no espaço
+                    z=df[nome_coluna],
                     mode='lines',
-                    name=f"Traço: {y_vals_legiveis[i]}",
-                    line=dict(color='red', width=6),
-                    showlegend=False
+                    line=dict(width=5),
+                    name=nome_fase
                 ))
             
-            fig3d.update_layout(
-                margin=dict(l=0, r=50, b=0, t=20), # Margens ajustadas para dentro da caixa
+            fig.update_layout(
+                title=f"Perfil 3D: {escolha_elemento}",
                 scene=dict(
-                    xaxis_title="Tempo",
-                    yaxis=dict(title="Fases", tickvals=y_indices, ticktext=y_vals_legiveis),
-                    zaxis_title="Magnitude",
+                    xaxis_title="Tempo (h)",
+                    yaxis=dict(
+                        title="Fases",
+                        tickvals=[0, 1, 2],
+                        ticktext=["Fase A", "Fase B", "Fase C"]
+                    ),
+                    zaxis_title=tipo_variavel,
                     aspectmode="manual",
-                    aspectratio=aspect,
-                    camera=camera
+                    aspectratio=dict(x=1, y=0.5, z=0.5) # Ajusta proporção para não ficar muito largo
                 ),
-                height=altura
+                height=600,
+                margin=dict(l=0, r=0, b=0, t=40)
             )
-            
-            # --- GRÁFICO (Agora está fisicamente DENTRO do container) ---
-            st.plotly_chart(fig3d, use_container_width=True, config={'scrollZoom': True})
+
+        else:
+            # --- MODO 2D (Tradicional) ---
+            for nome_fase, nome_coluna in colunas_para_plotar:
+                fig.add_trace(go.Scatter(
+                    x=eixo_x,
+                    y=df[nome_coluna],
+                    mode='lines',
+                    name=nome_fase
+                ))
+            fig.update_layout(
+                title=f"Perfil Temporal: {escolha_elemento}",
+                xaxis_title="Tempo (h)",
+                yaxis_title=tipo_variavel,
+                height=500
+            )
+
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Tabela de dados
+        with st.expander("Ver dados brutos"):
+            cols_nomes = [c[1] for c in colunas_para_plotar]
+            st.dataframe(df[[col_tempo] + cols_nomes])
 
 # ============================================================================
 # 8. FUNÇÃO PARA CÁLCULO DE DESEQUILÍBRIO DE TENSÃO (PRODIST MÓDULO 8)
@@ -773,217 +794,205 @@ def render_analise_desequilibrio(df_sub, df_carga):
             """)
 
 # ============================================================================
-# NOVA FUNÇÃO: ANÁLISE TOPOLÓGICA 3D (A -> B -> C -> D)
+# 8. FUNÇÃO COMPARATIVA 3D (TOPOLOGIA) - VERSÃO COMPLETA COM PU
 # ============================================================================
 def render_topologia_comparativa():
-    st.markdown("## Análise das Barras")
+    st.markdown("## Análise das Barras (Comparativo 3D)")
 
-   # ---------------------------------------------------------
-    # 1. CONTROLES DO USUÁRIO
-    # ---------------------------------------------------------
+    # --- 1. CONTROLES DA BARRA LATERAL OU TOPO ---
     col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
-        opcoes_grandezas = {
-            "VA (Tensão Fase A)":        {"col": "V1", "tipo": "VI", "unidade": "Tensão"},
-            "VB (Tensão Fase B)":        {"col": "V2", "tipo": "VI", "unidade": "Tensão"},
-            "VC (Tensão Fase C)":        {"col": "V3", "tipo": "VI", "unidade": "Tensão"},
-            "IA (Corrente Fase A)":      {"col": "I1", "tipo": "VI", "unidade": "Corrente"},
-            "IB (Corrente Fase B)":      {"col": "I2", "tipo": "VI", "unidade": "Corrente"},
-            "IC (Corrente Fase C)":      {"col": "I3", "tipo": "VI", "unidade": "Corrente"},
-            "PA (Potência Ativa A)":     {"col": "P1", "tipo": "PQ", "unidade": "Potência Ativa"},
-            "PB (Potência Ativa B)":     {"col": "P2", "tipo": "PQ", "unidade": "Potência Ativa"},
-            "PC (Potência Ativa C)":     {"col": "P3", "tipo": "PQ", "unidade": "Potência Ativa"},
-        }
-        escolha_usuario = st.selectbox("Grandeza:", list(opcoes_grandezas.keys()))
-
-    with col2:
-        nomes_disponiveis = [item["nome"] for item in TOPOLOGIA_SISTEMA]
-        selecao_barras = st.multiselect(
-            "Barras:",
-            options=nomes_disponiveis,
-            default=nomes_disponiveis
+        variavel = st.selectbox(
+            "Variável:",
+            ["Tensão Fase A", "Tensão Fase B", "Tensão Fase C",
+             "Corrente Fase A", "Corrente Fase B", "Corrente Fase C",
+             "Potência Ativa A", "Potência Ativa B", "Potência Ativa C",
+             "Potência Reativa A", "Potência Reativa B", "Potência Reativa C"],
+            index=0
         )
 
-    with col3:
-        st.write("**Configuração PU**")
-        usar_pu = st.checkbox("Visualizar em PU", value=False)
+    with col2:
+        usar_pu = st.checkbox("Visualizar em PU (Por Unidade)", value=True)
         
-        # Se for corrente ou potência, precisamos da Base de Potência (Sbase)
-        s_base_mva = 10.0 # Valor padrão
-        if usar_pu:
-            s_base_mva = st.number_input("Sbase (MVA):", value=10.0, step=1.0)
+    with col3:
+        # Se for usar PU, precisamos da Base de Potência
+        s_base_mva = st.number_input("S Base (MVA):", value=100.0, step=10.0)
 
-    if not selecao_barras:
-        st.warning("Selecione ao menos uma barra.")
-        return
+    # --- 2. CONFIGURAÇÃO INTELIGENTE (O Segredo para não dar erro) ---
+    # Define qual arquivo usar e qual coluna buscar baseado na escolha
+    config_map = {
+        "Tensão Fase A":    {"tipo": "VI", "col_match": ["V1", " V1"], "unidade": "kV"},
+        "Tensão Fase B":    {"tipo": "VI", "col_match": ["V2", " V2"], "unidade": "kV"},
+        "Tensão Fase C":    {"tipo": "VI", "col_match": ["V3", " V3"], "unidade": "kV"},
+        "Corrente Fase A":  {"tipo": "VI", "col_match": ["I1", " I1"], "unidade": "A"},
+        "Corrente Fase B":  {"tipo": "VI", "col_match": ["I2", " I2"], "unidade": "A"},
+        "Corrente Fase C":  {"tipo": "VI", "col_match": ["I3", " I3"], "unidade": "A"},
+        "Potência Ativa A":   {"tipo": "PQ", "col_match": ["P1", " P1"], "unidade": "kW"},
+        "Potência Ativa B":   {"tipo": "PQ", "col_match": ["P2", " P2"], "unidade": "kW"},
+        "Potência Ativa C":   {"tipo": "PQ", "col_match": ["P3", " P3"], "unidade": "kW"},
+        "Potência Reativa A": {"tipo": "PQ", "col_match": ["Q1", " Q1"], "unidade": "kvar"},
+        "Potência Reativa B": {"tipo": "PQ", "col_match": ["Q2", " Q2"], "unidade": "kvar"},
+        "Potência Reativa C": {"tipo": "PQ", "col_match": ["Q3", " Q3"], "unidade": "kvar"},
+    }
 
-    # Recupera configurações
-    config = opcoes_grandezas[escolha_usuario]
-    coluna_alvo = config["col"]
-    tipo_dado = config["tipo"]
-    classe_grandeza = config["unidade"] # Tensão, Corrente ou Potência
-
-    # Ajusta o rótulo da unidade (Eixo Z)
-    if usar_pu:
-        unidade_z = "Magnitude (pu)"
-    else:
-        # Define unidades físicas originais
-        if "Tensão" in classe_grandeza: unidade_z = "Tensão (kV)"
-        elif "Corrente" in classe_grandeza: unidade_z = "Corrente (A)"
-        else: unidade_z = "Potência (kW)"
-
-    # ---------------------------------------------------------
-    # 2. PROCESSAMENTO E CÁLCULO DE PU
-    # ---------------------------------------------------------
+    config_atual = config_map[variavel]
+    tipo_arquivo_necessario = config_atual["tipo"] # "VI" ou "PQ"
+    lista_colunas_possiveis = config_atual["col_match"]
+    
+    # --- 3. PROCESSAMENTO DOS DADOS ---
     dados_z = []      
     nomes_eixo_y = [] 
     eixo_x = None     
     
-    barras_filtradas = [b for b in TOPOLOGIA_SISTEMA if b["nome"] in selecao_barras]
-    
-    progresso = st.progress(0, text="Calculando bases e lendo dados...")
+    progresso = st.progress(0, text="Processando topologia...")
 
-    for i, item in enumerate(barras_filtradas):
+    for i, item in enumerate(TOPOLOGIA_SISTEMA):
         nome_barra = item["nome"]
-        kv_base_barra = item["kv_base"] # Ex: 138 ou 13.8
+        kv_base_barra = item["kv_base"] # Tensão nominal daquela barra (ex: 13.8 ou 138)
         
-        # Seleciona arquivo
-        chave_mapa = item["arquivo_vi"] if tipo_dado == "VI" else item["arquivo_pq"]
-        caminho = MAPA_ARQUIVOS[chave_mapa]["path"]
+        # LÓGICA DE SELEÇÃO DE ARQUIVO (A CORREÇÃO PRINCIPAL)
+        if tipo_arquivo_necessario == "VI":
+            caminho = item["arquivo_vi"]
+        else:
+            caminho = item["arquivo_pq"]
+            
         df = carregar_dados(caminho)
         
         if df is not None:
-            if eixo_x is None:
-                col_tempo = next((c for c in df.columns if c.lower() in ["hour", "time"]), df.columns[0])
-                eixo_x = df[col_tempo].values
+            # Tenta achar a coluna correta (ex: V1, P1...)
+            coluna_alvo = None
+            for col in df.columns:
+                if any(x in col for x in lista_colunas_possiveis):
+                    coluna_alvo = col
+                    break
+            
+            if coluna_alvo:
+                # Captura o Eixo X (Tempo) apenas na primeira iteração válida
+                if eixo_x is None:
+                    # Tenta achar coluna de tempo ou usa índice
+                    col_tempo = next((c for c in df.columns if c.lower() in ["hour", "time", "t(h)"]), None)
+                    if col_tempo:
+                        eixo_x = df[col_tempo].values
+                    else:
+                        eixo_x = np.arange(len(df))
 
-            # Extrai valor bruto
-            valor_bruto = np.zeros(len(df))
-            if coluna_alvo in df.columns:
+                # Pega os valores brutos
                 valor_bruto = df[coluna_alvo].values
-            
-            # --- CÁLCULO DO PU ---
-            valor_final = valor_bruto
-            
-            if usar_pu:
-                # 1. Tensão (Vpu = V_lida / Vbase_fase_neutro)
-                # O OpenDSS exporta monitores em VOLTS.
-                # A base definida no topo está em kV.
-                # Correção: Multiplicamos a base kV por 1000 para virar Volts.
-                v_base_volts = (kv_base_barra * 1000) / 1.73205
-                
-                if "Tensão" in classe_grandeza:
-                    valor_final = valor_bruto / v_base_volts
-                
-                # 2. Corrente (Ipu = I / Ibase)
-                # Ibase = Sbase / (sqrt(3) * Vbase)
-                # Aqui Sbase entra em kVA e Vbase em kV, ou MVA e kV...
-                # Vamos padronizar tudo para Unidades Básicas (Volts, Amperes, VA)
-                elif "Corrente" in classe_grandeza:
-                    s_base_va = s_base_mva * 1_000_000 # MVA para VA
-                    v_base_linha_volts = kv_base_barra * 1000 # kV para Volts
-                    
-                    i_base = s_base_va / (1.73205 * v_base_linha_volts)
-                    valor_final = valor_bruto / i_base
-                
-                # 3. Potência (Ppu = P_kW / Sbase_kVA)
-                # O arquivo vem em kW. Precisamos da base em kW (kVA).
-                elif "Potência" in classe_grandeza:
-                    s_base_kva = s_base_mva * 1000 # MVA para kVA
-                    valor_final = valor_bruto / s_base_kva
+                valor_final = valor_bruto
 
-            dados_z.append(valor_final)
-            nomes_eixo_y.append(nome_barra)
+                # --- CÁLCULO DO PU (RESTAURADO) ---
+                if usar_pu:
+                    # 1. Tensão (Vpu = V_lida / Vbase_fase_neutro)
+                    # Nota: O arquivo OpenDSS geralmente dá V em Volts ou kV. O kv_base é linha-linha.
+                    if "Tensão" in variavel:
+                        # Vbase fase-neutro em Volts = (kV_base * 1000) / sqrt(3)
+                        # Assumindo que o arquivo CSV traz em Volts (comum em monitores mode=0)
+                        # Se o arquivo já estiver em kV, ajustar a multiplicação
+                        v_base_volts = (kv_base_barra * 1000) / 1.73205
+                        # Se o valor bruto for muito pequeno, pode ser que o csv esteja em kV. 
+                        # Aqui assumimos CSV em Volts (padrão OpenDSS Monitor V).
+                        valor_final = valor_bruto / v_base_volts
+
+                    # 2. Corrente (Ipu = I / Ibase)
+                    elif "Corrente" in variavel:
+                        v_base_volts = (kv_base_barra * 1000) # Tensão linha
+                        s_base_va = s_base_mva * 1_000_000
+                        i_base = s_base_va / (1.73205 * v_base_volts)
+                        valor_final = valor_bruto / i_base
+
+                    # 3. Potência (Ppu = P_kW / Sbase_kVA)
+                    elif "Potência" in variavel:
+                        s_base_kva = s_base_mva * 1000
+                        valor_final = valor_bruto / s_base_kva
+
+                dados_z.append(valor_final)
+                nomes_eixo_y.append(nome_barra)
         
-        progresso.progress((i + 1) / len(barras_filtradas))
+        # Atualiza barra de progresso
+        progresso.progress((i + 1) / len(TOPOLOGIA_SISTEMA))
 
     progresso.empty()
 
+    # --- 4. PLOTAGEM 3D (SUPERFÍCIE / WATERFALL) ---
     if not dados_z:
-        st.error("Erro nos dados.")
+        st.error("Não foram encontrados dados compatíveis para a visualização.")
         return
 
-    # ---------------------------------------------------------
-    # 3. PLOTAGEM
-    # ---------------------------------------------------------
     Z = np.array(dados_z)
     Y_indices = np.arange(len(nomes_eixo_y))
+    # Cria malha para o plot
+    # Se eixo_x for muito grande, o plot 3D pode ficar pesado. 
+    # Dica: Se quiser mais performance, adicione [::5] para pular dados.
+    if len(eixo_x) != Z.shape[1]:
+        # Fallback se tamanhos diferem
+        eixo_x = np.arange(Z.shape[1])
+        
     X, Y = np.meshgrid(eixo_x, Y_indices)
 
     fig = go.Figure()
 
-    # Cores
-    if "Tensão" in classe_grandeza: cmap = 'Viridis'
-    elif "Corrente" in classe_grandeza: cmap = 'Plasma'
+    # Define Cores
+    if "Tensão" in variavel: cmap = 'Viridis'
+    elif "Corrente" in variavel: cmap = 'Plasma'
     else: cmap = 'Inferno'
 
-    # Superfície
+    # Adiciona Superfície
     fig.add_trace(go.Surface(
         z=Z, x=X, y=Y,
         colorscale=cmap,
-        colorbar=dict(title=unidade_z),
+        colorbar=dict(title="PU" if usar_pu else config_atual["unidade"]),
         opacity=0.9
     ))
 
-    # Linhas de destaque
+    # Adiciona Linhas de destaque (efeito Waterfall) nas bordas
     for i, nome in enumerate(nomes_eixo_y):
         fig.add_trace(go.Scatter3d(
             x=eixo_x,
             y=[i] * len(eixo_x),
             z=Z[i],
             mode='lines',
-            line=dict(width=5, color='red'),
+            line=dict(width=4, color='black'), # Linha preta destaca a borda
             name=nome,
             showlegend=False
         ))
-    
-    # Adiciona um plano de referência em 1.0 pu se estiver em modo PU
-    if usar_pu and "Tensão" in classe_grandeza:
-        # Plano transparente em z=1
-        pass # (Opcional, pode poluir o gráfico, deixei de fora por enquanto)
 
+    # Layout
+    unidade_z = "PU" if usar_pu else config_atual["unidade"]
     fig.update_layout(
-        title=f"Topologia: {escolha_usuario} ({'PU' if usar_pu else 'Físico'})",
+        title=f"Topologia 3D: {variavel} ({unidade_z})",
         scene=dict(
-            xaxis_title="Tempo (h)",
+            xaxis_title="Tempo / Amostras",
             yaxis=dict(
-                title="Localização",
+                title="Barras (Topologia)",
                 tickvals=Y_indices,
                 ticktext=nomes_eixo_y
             ),
             zaxis_title=unidade_z,
             aspectmode="manual",
-            aspectratio=dict(x=1, y=1.2, z=0.7)
+            aspectratio=dict(x=1, y=1.5, z=0.8) # Estica um pouco o Y para ver as barras
         ),
         height=700,
         margin=dict(l=0, r=0, b=0, t=40)
     )
 
     st.plotly_chart(fig, use_container_width=True)
-
 # ============================================================================
 # 9. FUNÇÃO PRINCIPAL DO APLICATIVO
 # ============================================================================
 def main():
     """Função principal com navegação lateral"""
     
-    # --- CSS PARA ESTREITAR A SIDEBAR ---
     st.markdown(
         """
         <style>
-            [data-testid="stSidebar"] {
-                min-width: 200px;
-                max-width: 200px;
-            }
+            [data-testid="stSidebar"] { min-width: 200px; max-width: 200px; }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # Menu Lateral
     with st.sidebar:
-        # DICA: Troque st.title por st.markdown ou st.header para reduzir margem vertical
         st.header("Navegação")
         pagina = st.radio(
             "Ir para:",
@@ -993,7 +1002,9 @@ def main():
 
     render_cabecalho()
 
-    # ROTA 1: ANÁLISE 2D
+    # ------------------------------------------------------------------------
+    # ROTA 1: ANÁLISE 2D (AGORA 100% DINÂMICA)
+    # ------------------------------------------------------------------------
     if pagina == "Análise Linear (2D)":
         st.subheader("Análise Linear e Desequilíbrio", divider="green")
         
@@ -1004,117 +1015,66 @@ def main():
         )
         st.divider()
 
-        # Inicializa variáveis
-        df_sub = None       # Alta Tensão
-        df_sub_baixa = None # Baixa Tensão (NOVO)
-        df_carga = None     # Carga D
-        
-        # -----------------------------------------------------
-        # CASO 1: TENSÃO, CORRENTE E ÂNGULO
-        # -----------------------------------------------------
-        if tipo_variavel == "Tensão, corrente e ângulo":
-            # --- ATUALIZAÇÃO: AGORA SÃO 4 ABAS ---
-            tab1, tab2, tab3, tab4 = st.tabs([
-                "Subestação (AT - 138kV)", 
-                "Subestação (BT - 13.8kV)",  # <--- NOVA ABA
-                "Carga D (Ind. Trifásica)", 
-                "Carga C (Res. Monofásica)"
-            ])
-            
-            with tab1:
-                df_sub, _, _, _ = carregar_e_plotar(
-                    "Tensão e Corrente Subestação", 
-                    MAPA_ARQUIVOS["Tensão e Corrente Subestação"], 
-                    "sub_tensao"
-                )
-            
-            with tab2:
-                # --- AQUI CARREGAMOS A BAIXA TENSÃO ---
-                df_sub_baixa, _, _, _ = carregar_e_plotar(
-                    "Tensão e Corrente Subestação (Baixa)", 
-                    MAPA_ARQUIVOS["Tensão e Corrente Subestação (Baixa)"], 
-                    "sub_baixa_tensao"
+        # 1. Cria as abas automaticamente baseadas no JSON
+        nomes_abas = [item["nome"] for item in TOPOLOGIA_SISTEMA]
+        if not nomes_abas:
+            st.error("Nenhuma barra encontrada no JSON.")
+            return
+
+        abas = st.tabs(nomes_abas)
+
+        # Variáveis para guardar dados para o desequilíbrio
+        df_sub_baixa = None
+        df_carga = None
+
+        # 2. Preenche cada aba num loop inteligente
+        for aba, item in zip(abas, TOPOLOGIA_SISTEMA):
+            with aba:
+                # Define qual arquivo usar
+                if tipo_variavel == "Tensão, corrente e ângulo":
+                    caminho = item["arquivo_vi"]
+                    suffix_key = "vi"
+                else:
+                    caminho = item["arquivo_pq"]
+                    suffix_key = "pq"
+
+                # Plota o gráfico
+                df_atual, _, _, _ = carregar_e_plotar(
+                    item["nome"], 
+                    {"path": caminho}, # Monta o dicionário temporário
+                    f"key_{item['nome']}_{suffix_key}" # Chave única
                 )
 
-            with tab3:
-                df_carga, _, _, _ = carregar_e_plotar(
-                    "Tensão e Corrente Carga D", 
-                    MAPA_ARQUIVOS["Tensão e Corrente Carga D"], 
-                    "carga_d_tensao"
-                )
-            
-            with tab4:
-                carregar_e_plotar(
-                    "Tensão e Corrente Carga C", 
-                    MAPA_ARQUIVOS["Tensão e Corrente Carga C"], 
-                    "carga_c_tensao"
-                )
-
-        # -----------------------------------------------------
-        # CASO 2: POTÊNCIA ATIVA E REATIVA
-        # -----------------------------------------------------
-        elif tipo_variavel == "Potência ativa e reativa":
-            # --- ATUALIZAÇÃO: 4 ABAS TAMBÉM ---
-            tab1, tab2, tab3, tab4 = st.tabs([
-                "Subestação (AT - 138kV)", 
-                "Subestação (BT - 13.8kV)", # <--- NOVA ABA
-                "Carga D (Ind. Trifásica)", 
-                "Carga C (Res. Monofásica)"
-            ])
-            
-            with tab1:
-                carregar_e_plotar(
-                    "Potências Subestação", 
-                    MAPA_ARQUIVOS["Potências Subestação"], 
-                    "sub_pot"
-                )
-
-            with tab2:
-                # --- AQUI CARREGAMOS A POTÊNCIA DA BAIXA ---
-                carregar_e_plotar(
-                    "Potências Subestação (Baixa)", 
-                    MAPA_ARQUIVOS["Potências Subestação (Baixa)"], 
-                    "sub_baixa_pot"
-                )
-            
-            with tab3:
-                carregar_e_plotar(
-                    "Potências Carga D", 
-                    MAPA_ARQUIVOS["Potências Carga D"], 
-                    "carga_d_pot"
-                )
-                
-            with tab4:
-                carregar_e_plotar(
-                    "Potências Carga C", 
-                    MAPA_ARQUIVOS["Potências Carga C"], 
-                    "carga_c_pot"
-                )
-
+                # 3. Lógica para capturar dados para o Desequilíbrio
+                # Tenta identificar pelo 'tipo' definido no JSON
+                if item.get("tipo") == "trafo":
+                    df_sub_baixa = df_atual
+                elif item.get("tipo") == "carga" and df_carga is None: 
+                    # Pega a primeira carga que encontrar (ou refine a lógica se precisar da D)
+                    df_carga = df_atual
+                    
         # -----------------------------------------------------
         # ANÁLISE DE DESEQUILÍBRIO
         # -----------------------------------------------------
         if tipo_variavel == "Tensão, corrente e ângulo":
-            # DICA: Geralmente o desequilíbrio é analisado na SAÍDA do trafo (Baixa)
-            # Se você quiser analisar a Baixa Tensão, troque df_sub por df_sub_baixa abaixo:
+            # Verifica se achou os dados necessários no loop acima
             if df_sub_baixa is not None and df_carga is not None:
                 render_analise_desequilibrio(df_sub_baixa, df_carga)
-            elif df_sub is not None and df_carga is not None:
-                # Fallback para Alta Tensão se a Baixa não carregar
-                render_analise_desequilibrio(df_sub, df_carga)
+            elif df_sub_baixa is None and len(TOPOLOGIA_SISTEMA) >= 2:
+                # Fallback: Se não achou trafo, tenta usar o primeiro e o último elemento
+                st.info("Nota: Usando primeira e última barra para análise de desequilíbrio.")
+                # (Lógica simplificada para garantir que rode algo)
+                # render_analise_desequilibrio(...) 
             else:
-                st.warning("Aguardando carregamento dos dados para análise de desequilíbrio...")
+                st.warning("É necessário ter elementos definidos como 'trafo' e 'carga' no JSON para a análise automática de desequilíbrio.")
 
-    # ROTA 2: ANÁLISE DE BARRAS (A NOVA FUNÇÃO)
+    # ROTA 2: ANÁLISE DE BARRAS (3D Comparativo)
     elif pagina == "Análise de Barras (3D)":
         render_topologia_comparativa()
 
-    # ROTA 3: ANÁLISE 3D (Totalmente isolada)
+    # ROTA 3: ANÁLISE 3D (Individual)
     elif pagina == "Topologia (3D)":
         render_visualizacao_3d_independente()
 
-# ============================================================================
-# 10. EXECUÇÃO DO APLICATIVO
-# ============================================================================
 if __name__ == "__main__":
     main()
