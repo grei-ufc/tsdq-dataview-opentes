@@ -382,56 +382,80 @@ def render_visualizacao_3d_independente():
     # 5. PLOTAGEM (AQUI ESTÁ A CORREÇÃO PARA 3D)
     if colunas_para_plotar:
         fig = go.Figure()
-
+        
+        # --- MODO 3D (EFEITO COMPLETO) ---
         if modo_visualizacao == "3D (Espacial)":
-            # --- MODO 3D ---
+            
+            # 1. PREPARAR DADOS
+            z_data = []
+            y_labels = [] 
+            
             for nome_fase, nome_coluna in colunas_para_plotar:
-                y_pos = posicao_fases[nome_fase] # 0, 1 ou 2
-                
+                z_data.append(df[nome_coluna].values)
+                y_labels.append(nome_fase)            
+            
+            # 2. CAMADA 1: O TAPETE (Superfície Colorida)
+            fig.add_trace(go.Surface(
+                z=z_data,
+                x=eixo_x,
+                y=[0, 1, 2], 
+                colorscale='Turbo',
+                opacity=0.8, # Deixei um pouco mais transparente para ver as linhas pretas
+                contours_z=dict(show=True, usecolormap=True, project_z=True),
+                colorbar=dict(title=tipo_variavel)
+            ))
+
+            # 3. CAMADA 2: AS BORDAS (Seu código aqui!)
+            # Isso desenha uma linha preta grossa em cima de cada fase para destacar
+            for i, nome in enumerate(y_labels):
                 fig.add_trace(go.Scatter3d(
                     x=eixo_x,
-                    y=[y_pos] * len(eixo_x), # Mantém o Y fixo para criar a "linha" no espaço
-                    z=df[nome_coluna],
+                    y=[i] * len(eixo_x),
+                    z=z_data[i], # Usa os mesmos dados do tapete
                     mode='lines',
-                    line=dict(width=5),
-                    name=nome_fase
+                    line=dict(width=5, color='black'), # Linha grossa preta
+                    name=nome,
+                    showlegend=False
                 ))
             
+            # 4. A MOLDURA (Layout Padronizado)
             fig.update_layout(
-                title=f"Perfil 3D: {escolha_elemento}",
-                scene=dict(
-                    xaxis_title="Tempo (h)",
-                    yaxis=dict(
-                        title="Fases",
-                        tickvals=[0, 1, 2],
-                        ticktext=["Fase A", "Fase B", "Fase C"]
-                    ),
-                    zaxis_title=tipo_variavel,
-                    aspectmode="manual",
-                    aspectratio=dict(x=1, y=0.5, z=0.5) # Ajusta proporção para não ficar muito largo
-                ),
+                title=f"Perfil: {escolha_elemento} - {tipo_variavel}",
                 height=600,
-                margin=dict(l=0, r=0, b=0, t=40)
+                margin=dict(l=0, r=0, b=0, t=40),
+                scene=dict(
+                    xaxis_title="Tempo",
+                    yaxis_title="Fases",
+                    zaxis_title=tipo_variavel,
+                    
+                    xaxis=dict(backgroundcolor="white", gridcolor="lightgrey", showbackground=True),
+                    yaxis=dict(
+                        backgroundcolor="white", 
+                        gridcolor="lightgrey", 
+                        showbackground=True,
+                        tickmode='array',      
+                        tickvals=[0, 1, 2],
+                        ticktext=y_labels
+                    ),
+                    zaxis=dict(backgroundcolor="white", gridcolor="lightgrey", showbackground=True),
+                    
+                    aspectmode="manual",
+                    aspectratio=dict(x=1, y=0.5, z=0.5) 
+                )
             )
 
+        # --- MODO 2D ---
         else:
-            # --- MODO 2D (Tradicional) ---
             for nome_fase, nome_coluna in colunas_para_plotar:
                 fig.add_trace(go.Scatter(
-                    x=eixo_x,
-                    y=df[nome_coluna],
-                    mode='lines',
-                    name=nome_fase
+                    x=eixo_x, y=df[nome_coluna], mode='lines', name=nome_fase
                 ))
-            fig.update_layout(
-                title=f"Perfil Temporal: {escolha_elemento}",
-                xaxis_title="Tempo (h)",
-                yaxis_title=tipo_variavel,
-                height=500
-            )
+            fig.update_layout(height=500, title=f"Perfil 2D: {escolha_elemento}")
 
         st.plotly_chart(fig, use_container_width=True)
         
+    else:
+        st.warning("Colunas não encontradas.")   
         # Tabela de dados
         with st.expander("Ver dados brutos"):
             cols_nomes = [c[1] for c in colunas_para_plotar]
@@ -799,6 +823,18 @@ def render_analise_desequilibrio(df_sub, df_carga):
 def render_topologia_comparativa():
     st.markdown("## Análise das Barras (Comparativo 3D)")
 
+# --- ADIÇÃO: FILTRO DE BARRAS (Coloque aqui) ---
+    todos_nomes = [t["nome"] for t in TOPOLOGIA_SISTEMA]
+    selecao = st.multiselect(
+        "Filtrar Barras:", 
+        options=todos_nomes, 
+        default=todos_nomes
+    )
+    
+    # Cria a lista que o resto do código vai usar
+    itens_filtrados = [t for t in TOPOLOGIA_SISTEMA if t["nome"] in selecao]
+    # -----------------------------------------------
+
     # --- 1. CONTROLES DA BARRA LATERAL OU TOPO ---
     col1, col2, col3 = st.columns([1, 1, 1])
     
@@ -847,7 +883,7 @@ def render_topologia_comparativa():
     
     progresso = st.progress(0, text="Processando topologia...")
 
-    for i, item in enumerate(TOPOLOGIA_SISTEMA):
+    for i, item in enumerate(itens_filtrados):
         nome_barra = item["nome"]
         kv_base_barra = item["kv_base"] # Tensão nominal daquela barra (ex: 13.8 ou 138)
         
