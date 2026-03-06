@@ -12,16 +12,24 @@ st.set_page_config(layout="wide", page_title="Visualizador OpenDSS - Tensão e C
 # =======================================================
 
 def realizar_mapeamento(df):
-    """Varre as colunas e organiza Tensão, Corrente, Ângulo e Taps usando Regex."""
+    """Varre as colunas e organiza todas as grandezas usando Regex."""
     mapa_barras = {}     
     mapa_correntes = {}  
     mapa_angulos = {}    
-    mapa_taps = {}       # NOVO: Dicionário para os Taps
+    mapa_taps = {}       
+    mapa_gen_p = {}      # NOVO: Potência de Geradores
+    mapa_dni = {}        # NOVO: Irradiância
+    mapa_pv_p = {}       # NOVO: Potência PV
 
     padrao_v = re.compile(r"Bus-([\w]+)-V(\d+)_pu")
     padrao_i = re.compile(r"Line-([\w]+)-I(\d+)_A")
     padrao_a = re.compile(r"Line-([\w]+)-I(\d+)_ang")
-    padrao_tap = re.compile(r"RegControl-([\w]+)-tap") # NOVO: Padrão para Taps
+    padrao_tap = re.compile(r"RegControl-([\w]+)-tap")
+    
+    # NOVOS PADRÕES
+    padrao_gen_p = re.compile(r"Generator-([\w.-]+)-P_mw")
+    padrao_dni = re.compile(r"([\w.-]+)-DNI")
+    padrao_pv_p = re.compile(r"([\w.-]+)-P_gen")
 
     for col in df.columns:
         # Tensão
@@ -48,14 +56,39 @@ def realizar_mapeamento(df):
             mapa_angulos[linha][fase] = col
             continue
 
-        # Taps dos Reguladores
+        # Taps
         m_tap = padrao_tap.search(col)
         if m_tap:
-            reg = m_tap.group(1) # Ex: creg1a
+            reg = m_tap.group(1)
             if reg not in mapa_taps: mapa_taps[reg] = {}
-            mapa_taps[reg]["Tap"] = col # Reguladores têm apenas 1 tap por controle
+            mapa_taps[reg]["Tap"] = col
+            continue
 
-    return mapa_barras, mapa_correntes, mapa_angulos, mapa_taps
+        # Gerador (MW)
+        m_gen = padrao_gen_p.search(col)
+        if m_gen:
+            gen = m_gen.group(1)
+            if gen not in mapa_gen_p: mapa_gen_p[gen] = {}
+            mapa_gen_p[gen]["P"] = col
+            continue
+
+        # Irradiância (DNI)
+        m_dni = padrao_dni.search(col)
+        if m_dni:
+            sensor = m_dni.group(1)
+            if sensor not in mapa_dni: mapa_dni[sensor] = {}
+            mapa_dni[sensor]["DNI"] = col
+            continue
+
+        # Fotovoltaico (Potência Gerada)
+        m_pv = padrao_pv_p.search(col)
+        if m_pv:
+            pv = m_pv.group(1)
+            if pv not in mapa_pv_p: mapa_pv_p[pv] = {}
+            mapa_pv_p[pv]["P"] = col
+            continue
+
+    return mapa_barras, mapa_correntes, mapa_angulos, mapa_taps, mapa_gen_p, mapa_dni, mapa_pv_p
 
 # =======================================================
 # FUNÇÕES VISUAIS
@@ -119,7 +152,7 @@ if uploaded_file:
     col_time = 'Tempo_EixoX'
 
     # 3. Mapeamento de todas as grandezas possíveis
-    m_v, m_i, m_ang, m_tap = realizar_mapeamento(df)
+    m_v, m_i, m_ang, m_tap, m_gen, m_dni, m_pv = realizar_mapeamento(df)
 
     # 4. Interface Lateral para escolha da Grandeza
     st.sidebar.header("Configurações de Dados")
@@ -128,6 +161,9 @@ if uploaded_file:
     if m_i: opcoes_disponiveis.append("Corrente (A)")
     if m_ang: opcoes_disponiveis.append("Ângulo de Corrente (°)")
     if m_tap: opcoes_disponiveis.append("Taps dos Reguladores")
+    if m_gen: opcoes_disponiveis.append("Potência do Gerador (MW)")
+    if m_dni: opcoes_disponiveis.append("Irradiância Solar (DNI)")
+    if m_pv: opcoes_disponiveis.append("Potência Fotovoltaica")
 
     if not opcoes_disponiveis:
         st.error("❌ O arquivo não possui colunas nos padrões reconhecidos.")
@@ -142,38 +178,48 @@ if uploaded_file:
         mapa_ativo, label_y, prefixo = m_i, "Corrente (A)", "I"
     elif grandeza == "Ângulo de Corrente (°)":
         mapa_ativo, label_y, prefixo = m_ang, "Ângulo (°)", "I"
-    else:
+    elif grandeza == "Taps dos Reguladores":
         mapa_ativo, label_y, prefixo = m_tap, "Posição do Tap", "Tap"
+    elif grandeza == "Potência do Gerador (MW)":
+        mapa_ativo, label_y, prefixo = m_gen, "Potência Ativa (MW)", "P"
+    elif grandeza == "Irradiância Solar (DNI)":
+        mapa_ativo, label_y, prefixo = m_dni, "DNI (W/m²)", "DNI"
+    elif grandeza == "Potência Fotovoltaica":
+        mapa_ativo, label_y, prefixo = m_pv, "Potência Gerada", "P"
 
     pagina = st.sidebar.radio("Navegação:", ["Gráfico 2D", "Superfície 3D"])
+
+    # Verifica se a grandeza tem 3 fases ou é valor único (Tap, DNI, P)
+    tem_fases = grandeza in ["Tensão (pu)", "Corrente (A)", "Ângulo de Corrente (°)"]
 
     # =======================================================
     # VISUALIZAÇÃO 2D
     # =======================================================
     if pagina == "Gráfico 2D":
-        tipo_elem = 'Regulador' if grandeza == "Taps dos Reguladores" else ('Barra' if 'V' in prefixo else 'Linha')
-        elemento = st.selectbox(f"Selecione o Elemento ({tipo_elem}):", 
-                                options=sorted(mapa_ativo.keys()))
+        elemento = st.selectbox(f"Selecione o Elemento:", options=sorted(mapa_ativo.keys()))
         
         fig = go.Figure()
-        cores = {'1': '#FF4B4B', '2': '#1C83E1', '3': '#00CC96', 'Tap': '#9B59B6'}
+        cores_fases = {'1': '#FF4B4B', '2': '#1C83E1', '3': '#00CC96'}
         
-        fases_para_plotar = ['Tap'] if grandeza == "Taps dos Reguladores" else ['1', '2', '3']
+        chaves_para_plotar = [f"{prefixo}1", f"{prefixo}2", f"{prefixo}3"] if tem_fases else [prefixo]
 
-        for f in fases_para_plotar:
-            f_key = "Tap" if grandeza == "Taps dos Reguladores" else f"{prefixo}{f}"
-            
-            if f_key in mapa_ativo[elemento]:
-                nome_legenda = "Posição do Tap" if grandeza == "Taps dos Reguladores" else f"Fase {f}"
-                cor_linha = cores['Tap'] if grandeza == "Taps dos Reguladores" else cores[f]
+        for chave in chaves_para_plotar:
+            if chave in mapa_ativo[elemento]:
+                # Configurações visuais (nome da legenda, cor, formato da linha)
+                if tem_fases:
+                    nome_legenda = f"Fase {chave[-1]}"
+                    cor_linha = cores_fases.get(chave[-1], '#000')
+                    formato_linha = 'linear'
+                else:
+                    nome_legenda = grandeza
+                    cor_linha = '#9B59B6' if prefixo == 'Tap' else '#F39C12'
+                    formato_linha = 'hv' if prefixo == 'Tap' else 'linear'
                 
                 fig.add_trace(go.Scatter(
-                    x=df[col_time], y=df[mapa_ativo[elemento][f_key]],
+                    x=df[col_time], y=df[mapa_ativo[elemento][chave]],
                     mode='lines', name=nome_legenda, line=dict(color=cor_linha),
-                    line_shape='hv' if grandeza == "Taps dos Reguladores" else 'linear'
+                    line_shape=formato_linha
                 ))
-
-        # (As linhas fixas de 1.05 e 0.92 foram removidas daqui para o Plotly usar Auto-Scaling)
 
         fig.update_layout(title=f"{grandeza} - {elemento}", yaxis_title=label_y, template="plotly_white", height=600)
         st.plotly_chart(fig, use_container_width=True)
@@ -182,13 +228,14 @@ if uploaded_file:
     # VISUALIZAÇÃO 3D
     # =======================================================
     elif pagina == "Superfície 3D":
-        if grandeza == "Taps dos Reguladores":
-            f_esc = "Tap"
-            f_key = "Tap"
-            st.info("💡 Exibindo o mapa 3D de todas as posições de Taps.")
-        else:
+        if tem_fases:
             f_esc = st.radio("Escolha a Fase para o Mapa:", [1, 2, 3], horizontal=True)
             f_key = f"{prefixo}{f_esc}"
+            titulo_3d = f"Mapa de {grandeza} - Fase {f_esc}"
+        else:
+            f_key = prefixo
+            titulo_3d = f"Mapa de {grandeza}"
+            st.info(f"💡 Exibindo o mapa 3D geral para {grandeza}.")
         
         lista_elementos = sorted(mapa_ativo.keys())
         z_data = []
@@ -200,8 +247,6 @@ if uploaded_file:
         
         z_matrix = np.array(z_data).T
         fig_3d = go.Figure(data=[go.Surface(z=z_matrix, x=lista_elementos, colorscale='Viridis')])
-        
-        titulo_3d = f"Mapa de {grandeza}" if grandeza == "Taps dos Reguladores" else f"Mapa de {grandeza} - Fase {f_esc}"
         
         fig_3d.update_layout(
             title=titulo_3d,
