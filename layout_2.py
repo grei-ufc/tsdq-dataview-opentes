@@ -196,8 +196,27 @@ if uploaded_file:
     # VISUALIZAÇÃO 2D
     # =======================================================
     if pagina == "Gráfico 2D":
-        elemento = st.selectbox(f"Selecione o Elemento:", options=sorted(mapa_ativo.keys()))
+        # Função para deixar os nomes mais claros no menu
+        def formatar_nome(nome):
+            if nome.endswith('r') and prefixo == 'V':
+                return f"{nome} (Lado Secundário/Regulado)"
+            elif f"{nome}r" in mapa_ativo.keys() and prefixo == 'V':
+                return f"{nome} (Lado Primário da Fonte)"
+            return nome
+
+        # Botão com os nomes formatados
+        elemento = st.selectbox(
+            f"Selecione o Elemento:", 
+            options=sorted(mapa_ativo.keys()),
+            format_func=formatar_nome
+        )
         
+        # Caixinha de aviso inteligente (Aparece só quando necessário)
+        if elemento.endswith('r') and prefixo == 'V':
+            st.info(f"💡 **Você sabia?** A barra **{elemento}** representa o lado secundário de um Regulador de Tensão. A tensão aqui já sofreu a correção do Tap em relação à barra **{elemento[:-1]}**.")
+        elif f"{elemento}r" in mapa_ativo.keys() and prefixo == 'V':
+            st.info(f"💡 **Dica:** Esta barra é o lado primário de um Regulador. Compare-a com a barra **{elemento}r** para ver o salto de tensão causado pelo Tap!")
+
         fig = go.Figure()
         cores_fases = {'1': '#FF4B4B', '2': '#1C83E1', '3': '#00CC96'}
         
