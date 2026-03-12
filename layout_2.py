@@ -265,11 +265,38 @@ if uploaded_file:
                 z_data.append(np.full(len(df), np.nan))
         
         z_matrix = np.array(z_data).T
-        fig_3d = go.Figure(data=[go.Surface(z=z_matrix, x=lista_elementos, colorscale='Viridis')])
+        
+        # --- NOVO: Tratamento do Eixo Y para Horário ---
+        # Se a coluna de tempo for do tipo data, extrai apenas a Hora e o Minuto (HH:MM)
+        if pd.api.types.is_datetime64_any_dtype(df[col_time]):
+            eixo_y = df[col_time].dt.strftime('%H:%M')
+        else:
+            eixo_y = df[col_time] # Se for apenas um 'Passo' numérico, usa ele mesmo
+            
+        # Adicionamos y=eixo_y na construção da Superfície
+        fig_3d = go.Figure(data=[go.Surface(
+            z=z_matrix, 
+            x=lista_elementos, 
+            y=eixo_y, 
+            colorscale='Viridis',
+            colorbar=dict(
+                title=label_y,
+                nticks=15,        # Força 15 valores diferentes na barra de cores
+                tickformat=".3f"  # Mostra 3 casas decimais (ex: 1.025)
+            )
+        )])
         
         fig_3d.update_layout(
             title=titulo_3d,
-            scene=dict(xaxis_title="Elementos", yaxis_title="Tempo", zaxis_title=label_y),
+            scene=dict(
+                xaxis_title="Elementos", 
+                yaxis_title="Horário", 
+                zaxis_title=label_y,
+                zaxis=dict(
+                    nticks=15,        # Força 15 valores na escala vertical do gráfico 3D
+                    tickformat=".3f"  # Mostra 3 casas decimais
+                )
+            ),
             height=750
         )
         st.plotly_chart(fig_3d, use_container_width=True)
