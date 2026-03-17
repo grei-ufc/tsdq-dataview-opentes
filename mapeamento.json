@@ -1,0 +1,37 @@
+{
+  "Tensão (pu)": {
+    "regex": "Bus-([\\w.-]+)-V(\\d+)_pu",
+    "prefixo": "V",
+    "tem_fase": true
+  },
+  "Corrente (A)": {
+    "regex": "Line-([\\w.-]+)-I(\\d+)_A",
+    "prefixo": "I",
+    "tem_fase": true
+  },
+  "Ângulo de Corrente (°)": {
+    "regex": "Line-([\\w.-]+)-I(\\d+)_ang",
+    "prefixo": "I",
+    "tem_fase": true
+  },
+  "Taps dos Reguladores": {
+    "regex": "RegControl-([\\w.-]+)-tap",
+    "prefixo": "Tap",
+    "tem_fase": false
+  },
+  "Potência do Gerador (MW)": {
+    "regex": "Generator-([\\w.-]+)-P_mw",
+    "prefixo": "P",
+    "tem_fase": false
+  },
+  "Irradiância Solar (DNI)": {
+    "regex": "([\\w.-]+)-DNI",
+    "prefixo": "DNI",
+    "tem_fase": false
+  },
+  "Potência Fotovoltaica": {
+    "regex": "([\\w.-]+)-P_gen",
+    "prefixo": "P",
+    "tem_fase": false
+  }
+}

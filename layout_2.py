@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import re
 import numpy as np
-
+import json
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Visualizador OpenDSS - Tensão e Corrente")
 
@@ -11,84 +11,38 @@ st.set_page_config(layout="wide", page_title="Visualizador OpenDSS - Tensão e C
 # FUNÇÕES DE PROCESSAMENTO E MAPEAMENTO
 # =======================================================
 
-def realizar_mapeamento(df):
-    """Varre as colunas e organiza todas as grandezas usando Regex."""
-    mapa_barras = {}     
-    mapa_correntes = {}  
-    mapa_angulos = {}    
-    mapa_taps = {}       
-    mapa_gen_p = {}      # NOVO: Potência de Geradores
-    mapa_dni = {}        # NOVO: Irradiância
-    mapa_pv_p = {}       # NOVO: Potência PV
+# 1. Função para ler o arquivo JSON de metadados
+def carregar_metadados(caminho_arquivo="mapeamento.json"):
+    try:
+        with open(caminho_arquivo, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        import streamlit as st
+        st.error(f"❌ Arquivo de configuração '{caminho_arquivo}' não encontrado!")
+        st.stop()
 
-    padrao_v = re.compile(r"Bus-([\w]+)-V(\d+)_pu")
-    padrao_i = re.compile(r"Line-([\w]+)-I(\d+)_A")
-    padrao_a = re.compile(r"Line-([\w]+)-I(\d+)_ang")
-    padrao_tap = re.compile(r"RegControl-([\w]+)-tap")
-    
-    # NOVOS PADRÕES
-    padrao_gen_p = re.compile(r"Generator-([\w.-]+)-P_mw")
-    padrao_dni = re.compile(r"([\w.-]+)-DNI")
-    padrao_pv_p = re.compile(r"([\w.-]+)-P_gen")
+# 2. Nova função de mapeamento dinâmico
+def realizar_mapeamento_dinamico(df, config):
+    """Varre as colunas e organiza os dados com base no JSON de metadados."""
+    mapas = {grandeza: {} for grandeza in config.keys()}
+    padroes = {grandeza: re.compile(dados["regex"]) for grandeza, dados in config.items()}
 
     for col in df.columns:
-        # Tensão
-        m_v = padrao_v.search(col)
-        if m_v:
-            barra, fase = m_v.group(1), f"V{m_v.group(2)}"
-            if barra not in mapa_barras: mapa_barras[barra] = {}
-            mapa_barras[barra][fase] = col
-            continue
-
-        # Corrente
-        m_i = padrao_i.search(col)
-        if m_i:
-            linha, fase = m_i.group(1), f"I{m_i.group(2)}"
-            if linha not in mapa_correntes: mapa_correntes[linha] = {}
-            mapa_correntes[linha][fase] = col
-            continue
-            
-        # Ângulo
-        m_a = padrao_a.search(col)
-        if m_a:
-            linha, fase = m_a.group(1), f"I{m_a.group(2)}"
-            if linha not in mapa_angulos: mapa_angulos[linha] = {}
-            mapa_angulos[linha][fase] = col
-            continue
-
-        # Taps
-        m_tap = padrao_tap.search(col)
-        if m_tap:
-            reg = m_tap.group(1)
-            if reg not in mapa_taps: mapa_taps[reg] = {}
-            mapa_taps[reg]["Tap"] = col
-            continue
-
-        # Gerador (MW)
-        m_gen = padrao_gen_p.search(col)
-        if m_gen:
-            gen = m_gen.group(1)
-            if gen not in mapa_gen_p: mapa_gen_p[gen] = {}
-            mapa_gen_p[gen]["P"] = col
-            continue
-
-        # Irradiância (DNI)
-        m_dni = padrao_dni.search(col)
-        if m_dni:
-            sensor = m_dni.group(1)
-            if sensor not in mapa_dni: mapa_dni[sensor] = {}
-            mapa_dni[sensor]["DNI"] = col
-            continue
-
-        # Fotovoltaico (Potência Gerada)
-        m_pv = padrao_pv_p.search(col)
-        if m_pv:
-            pv = m_pv.group(1)
-            if pv not in mapa_pv_p: mapa_pv_p[pv] = {}
-            mapa_pv_p[pv]["P"] = col
-            continue
-
-    return mapa_barras, mapa_correntes, mapa_angulos, mapa_taps, mapa_gen_p, mapa_dni, mapa_pv_p
+        for grandeza, dados in config.items():
+            match = padroes[grandeza].search(col)
+            if match:
+                elemento = match.group(1) 
+                if dados["tem_fase"]:
+                    fase = f"{dados['prefixo']}{match.group(2)}"
+                else:
+                    fase = dados["prefixo"]
+                
+                if elemento not in mapas[grandeza]:
+                    mapas[grandeza][elemento] = {}
+                mapas[grandeza][elemento][fase] = col
+                break 
+                
+    return mapas
 
 # =======================================================
 # FUNÇÕES VISUAIS
@@ -151,46 +105,29 @@ if uploaded_file:
         
     col_time = 'Tempo_EixoX'
 
-    # 3. Mapeamento de todas as grandezas possíveis
-    m_v, m_i, m_ang, m_tap, m_gen, m_dni, m_pv = realizar_mapeamento(df)
+    # 3. Mapeamento Dinâmico via JSON
+    config_metadados = carregar_metadados("mapeamento.json")
+    mapas_gerais = realizar_mapeamento_dinamico(df, config_metadados)
 
     # 4. Interface Lateral para escolha da Grandeza
     st.sidebar.header("Configurações de Dados")
-    opcoes_disponiveis = []
-    if m_v: opcoes_disponiveis.append("Tensão (pu)")
-    if m_i: opcoes_disponiveis.append("Corrente (A)")
-    if m_ang: opcoes_disponiveis.append("Ângulo de Corrente (°)")
-    if m_tap: opcoes_disponiveis.append("Taps dos Reguladores")
-    if m_gen: opcoes_disponiveis.append("Potência do Gerador (MW)")
-    if m_dni: opcoes_disponiveis.append("Irradiância Solar (DNI)")
-    if m_pv: opcoes_disponiveis.append("Potência Fotovoltaica")
+    opcoes_disponiveis = [g for g, mapa in mapas_gerais.items() if mapa]
 
     if not opcoes_disponiveis:
-        st.error("❌ O arquivo não possui colunas nos padrões reconhecidos.")
+        st.error("❌ O arquivo não possui colunas que correspondam aos metadados cadastrados no JSON.")
         st.stop()
 
     grandeza = st.sidebar.selectbox("O que deseja analisar?", opcoes_disponiveis)
 
-    # Configuração dinâmica baseada na grandeza
-    if grandeza == "Tensão (pu)":
-        mapa_ativo, label_y, prefixo = m_v, "Tensão (pu)", "V"
-    elif grandeza == "Corrente (A)":
-        mapa_ativo, label_y, prefixo = m_i, "Corrente (A)", "I"
-    elif grandeza == "Ângulo de Corrente (°)":
-        mapa_ativo, label_y, prefixo = m_ang, "Ângulo (°)", "I"
-    elif grandeza == "Taps dos Reguladores":
-        mapa_ativo, label_y, prefixo = m_tap, "Posição do Tap", "Tap"
-    elif grandeza == "Potência do Gerador (MW)":
-        mapa_ativo, label_y, prefixo = m_gen, "Potência Ativa (MW)", "P"
-    elif grandeza == "Irradiância Solar (DNI)":
-        mapa_ativo, label_y, prefixo = m_dni, "DNI (W/m²)", "DNI"
-    elif grandeza == "Potência Fotovoltaica":
-        mapa_ativo, label_y, prefixo = m_pv, "Potência Gerada", "P"
+    # 5. Configuração dinâmica puxada diretamente do JSON
+    mapa_ativo = mapas_gerais[grandeza]
+    config_ativa = config_metadados[grandeza]
+    
+    prefixo = config_ativa["prefixo"]
+    tem_fases = config_ativa["tem_fase"]
+    label_y = grandeza 
 
     pagina = st.sidebar.radio("Navegação:", ["Gráfico 2D", "Superfície 3D"])
-
-    # Verifica se a grandeza tem 3 fases ou é valor único (Tap, DNI, P)
-    tem_fases = grandeza in ["Tensão (pu)", "Corrente (A)", "Ângulo de Corrente (°)"]
 
     # =======================================================
     # VISUALIZAÇÃO 2D
