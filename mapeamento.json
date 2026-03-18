@@ -1,37 +1,65 @@
 {
   "Tensão (pu)": {
-    "regex": "Bus-([\\w.-]+)-V(\\d+)_pu",
+    "_instrucao_equipe": "Padrão: Bus-{NOME}-V{FASE}_pu",
+    "_exemplo": "Bus-Barra Principal-V1_pu",
+    "regex": "Bus-(.+?)-V(\\d+)_pu",
     "prefixo": "V",
     "tem_fase": true
   },
   "Corrente (A)": {
-    "regex": "Line-([\\w.-]+)-I(\\d+)_A",
+    "_instrucao_equipe": "Padrão: Line-{NOME}-I{FASE}_A",
+    "_exemplo": "Line-Ramal Centro-I2_A",
+    "regex": "Line-(.+?)-I(\\d+)_A",
     "prefixo": "I",
     "tem_fase": true
   },
   "Ângulo de Corrente (°)": {
-    "regex": "Line-([\\w.-]+)-I(\\d+)_ang",
+    "_instrucao_equipe": "Padrão: Line-{NOME}-I{FASE}_ang",
+    "_exemplo": "Line-Ramal Centro-I2_ang",
+    "regex": "Line-(.+?)-I(\\d+)_ang",
     "prefixo": "I",
     "tem_fase": true
   },
   "Taps dos Reguladores": {
-    "regex": "RegControl-([\\w.-]+)-tap",
+    "_instrucao_equipe": "Padrão: RegControl-{NOME}-tap",
+    "_exemplo": "RegControl-creg1a-tap",
+    "regex": "RegControl-(.+?)-tap",
     "prefixo": "Tap",
     "tem_fase": false
   },
   "Potência do Gerador (MW)": {
-    "regex": "Generator-([\\w.-]+)-P_mw",
+    "_instrucao_equipe": "Padrão: Generator-{NOME}-P_mw",
+    "_exemplo": "Generator-Gen_0-P_mw",
+    "regex": "Generator-(.+?)-P_mw",
     "prefixo": "P",
     "tem_fase": false
   },
   "Irradiância Solar (DNI)": {
-    "regex": "([\\w.-]+)-DNI",
+    "_instrucao_equipe": "Padrão: {NOME}-DNI",
+    "_exemplo": "Sensor_01-DNI ou CSV-0.csv-0-DNI",
+    "regex": "(.+?)-DNI",
     "prefixo": "DNI",
     "tem_fase": false
   },
   "Potência Fotovoltaica": {
-    "regex": "([\\w.-]+)-P_gen",
+    "_instrucao_equipe": "Padrão: {NOME}-P_gen",
+    "_exemplo": "PV-0.PV_0-P_gen ou Usina_Solar-P_gen",
+    "regex": "(.+?)-P_gen",
     "prefixo": "P",
+    "tem_fase": false
+  },
+  "Potência Ativa da Rede (MW)": {
+    "_instrucao_equipe": "Padrão: Grid-{ID}-{NOME}-p_mw",
+    "_exemplo": "Grid-0.0-LV2.101 Bus 19-p_mw",
+    "regex": "Grid-[\\w.-]+-(.+?)-p_mw",
+    "prefixo": "P",
+    "tem_fase": false
+  },
+  "Potência Reativa da Rede (MVAr)": {
+    "_instrucao_equipe": "Padrão: Grid-{ID}-{NOME}-q_mvar",
+    "_exemplo": "Grid-0.0-LV2.101 Bus 28-q_mvar",
+    "regex": "Grid-[\\w.-]+-(.+?)-q_mvar",
+    "prefixo": "Q",
     "tem_fase": false
   }
 }

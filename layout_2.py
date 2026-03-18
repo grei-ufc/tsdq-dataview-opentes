@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import re
 import numpy as np
 import json
+import os 
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Visualizador OpenDSS - Tensão e Corrente")
 
@@ -12,13 +13,20 @@ st.set_page_config(layout="wide", page_title="Visualizador OpenDSS - Tensão e C
 # =======================================================
 
 # 1. Função para ler o arquivo JSON de metadados
-def carregar_metadados(caminho_arquivo="mapeamento.json"):
+def carregar_metadados(nome_arquivo="mapeamento.json"):
+    # Descobre a pasta exata onde este arquivo layout_2.py está salvo
+    diretorio_atual = os.path.dirname(os.path.abspath(__file__))
+    # Monta o caminho completo até o JSON
+    caminho_completo = os.path.join(diretorio_atual, nome_arquivo)
+    
     try:
-        with open(caminho_arquivo, 'r', encoding='utf-8') as f:
+        with open(caminho_completo, 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
         import streamlit as st
-        st.error(f"❌ Arquivo de configuração '{caminho_arquivo}' não encontrado!")
+        st.error(f"❌ Arquivo de configuração não encontrado!")
+        st.warning(f"O código procurou o arquivo exatamente aqui:\n`{caminho_completo}`")
+        st.info("💡 Dica: Verifique se o arquivo não foi salvo acidentalmente como 'mapeamento.json.txt' (o Windows costuma ocultar o .txt final).")
         st.stop()
 
 # 2. Nova função de mapeamento dinâmico
@@ -161,23 +169,49 @@ if uploaded_file:
 
         for chave in chaves_para_plotar:
             if chave in mapa_ativo[elemento]:
-                # Configurações visuais (nome da legenda, cor, formato da linha)
+                # Captura os dados numéricos dessa curva
+                dados_y = df[mapa_ativo[elemento][chave]]
+                val_min = dados_y.min()
+                val_max = dados_y.max()
+                
+                # NOVO: Trocamos .3f por .5g para exibir valores minúsculos com precisão!
                 if tem_fases:
-                    nome_legenda = f"Fase {chave[-1]}"
+                    nome_legenda = f"Fase {chave[-1]} (Mín: {val_min:.5g} | Máx: {val_max:.5g})"
                     cor_linha = cores_fases.get(chave[-1], '#000')
                     formato_linha = 'linear'
                 else:
-                    nome_legenda = grandeza
+                    nome_legenda = f"{grandeza} (Mín: {val_min:.5g} | Máx: {val_max:.5g})"
                     cor_linha = '#9B59B6' if prefixo == 'Tap' else '#F39C12'
                     formato_linha = 'hv' if prefixo == 'Tap' else 'linear'
                 
                 fig.add_trace(go.Scatter(
-                    x=df[col_time], y=df[mapa_ativo[elemento][chave]],
+                    x=df[col_time], y=dados_y,
                     mode='lines', name=nome_legenda, line=dict(color=cor_linha),
                     line_shape=formato_linha
                 ))
 
-        fig.update_layout(title=f"{grandeza} - {elemento}", yaxis_title=label_y, template="plotly_white", height=600)
+        # Adiciona limites clicáveis do PRODIST apenas se for Tensão
+        if grandeza == "Tensão (pu)":
+            tempo_min = df[col_time].min()
+            tempo_max = df[col_time].max()
+            fig.add_trace(go.Scatter(x=[tempo_min, tempo_max], y=[1.05, 1.05], mode='lines', name='🚨 Limite Sup. (1.05)', line=dict(color='red', dash='dash'), visible='legendonly'))
+            fig.add_trace(go.Scatter(x=[tempo_min, tempo_max], y=[0.92, 0.92], mode='lines', name='🚨 Limite Inf. (0.92)', line=dict(color='orange', dash='dash'), visible='legendonly'))
+
+        # A Mágica do Eixo Y Automático e Inteligente
+        fig.update_layout(
+            title=f"{grandeza} - {elemento}", 
+            yaxis=dict(
+                title=label_y,
+                autorange=True,
+                nticks=12,
+                tickformat=".5g",  # <-- NOVO: Força o Plotly a mostrar micro-variações no eixo Y
+                zeroline=False     # <-- NOVO: Desligamos a linha do zero para ela não esmagar o zoom
+            ),
+            xaxis_title="Tempo",
+            template="plotly_white", 
+            height=600,
+            hovermode="x unified"
+        )
         st.plotly_chart(fig, use_container_width=True)
 
     # =======================================================
