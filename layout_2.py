@@ -95,7 +95,7 @@ uploaded_file = st.file_uploader("Arraste seu CSV aqui", type=["csv"])
 
 if uploaded_file:
     # 1. Leitura e Limpeza
-    df = pd.read_csv(uploaded_file)
+    df = pd.read_csv(uploaded_file, sep=None, engine='python')
     df.columns = df.columns.str.strip() 
 
    # =======================================================
@@ -112,6 +112,28 @@ if uploaded_file:
         df['Tempo_EixoX'] = range(len(df))
         
     col_time = 'Tempo_EixoX'
+
+# =======================================================
+    # FILTRO DE DATA (NOVO)
+    # =======================================================
+    # Só tenta criar o filtro se a coluna de tempo foi reconhecida como Data/Hora
+    if pd.api.types.is_datetime64_any_dtype(df['Tempo_EixoX']):
+        # Extrai apenas o Dia/Mês/Ano ignorando as horas
+        df['Data_Filtro'] = df['Tempo_EixoX'].dt.date
+        
+        # Pega a lista de todos os dias únicos que existem na planilha
+        datas_disponiveis = df['Data_Filtro'].dropna().unique()
+        
+        # Cria o seletor no menu lateral
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📅 Período de Análise")
+        dia_selecionado = st.sidebar.selectbox("Selecione o dia:", datas_disponiveis)
+        
+        # O Pulo do Gato: Sobrescreve o dataframe apagando os outros dias
+        # Assim, todo o resto do seu código (gráficos, tabelas) vai usar só esse dia!
+        df = df[df['Data_Filtro'] == dia_selecionado].reset_index(drop=True)
+    else:
+        st.sidebar.warning("⚠️ Não foi possível identificar datas na primeira coluna. Filtro por dia desativado.")
 
     # 3. Mapeamento Dinâmico via JSON
     config_metadados = carregar_metadados("mapeamento.json")
@@ -165,7 +187,7 @@ if uploaded_file:
         fig = go.Figure()
         cores_fases = {'1': '#FF4B4B', '2': '#1C83E1', '3': '#00CC96'}
         
-        chaves_para_plotar = [f"{prefixo}1", f"{prefixo}2", f"{prefixo}3"] if tem_fases else [prefixo]
+        chaves_para_plotar = list(mapa_ativo[elemento].keys())
 
         for chave in chaves_para_plotar:
             if chave in mapa_ativo[elemento]:

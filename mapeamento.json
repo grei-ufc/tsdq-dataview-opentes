@@ -61,5 +61,19 @@
     "regex": "Grid-[\\w.-]+-(.+?)-q_mvar",
     "prefixo": "Q",
     "tem_fase": false
+  },
+  "Tensão do Medidor (V)": {
+    "_instrucao_equipe": "Padrão: tensao.average.v{FASE}n[V]",
+    "_exemplo": "tensao.average.van[V]",
+    "regex": "(tensao\\.average)\\.v([a-c])n\\[V\\]",
+    "prefixo": "Fase ",
+    "tem_fase": true
+  },
+  "Corrente do Medidor (A)": {
+    "_instrucao_equipe": "Padrão: corrente.average.i{FASE}[A]",
+    "_exemplo": "corrente.average.ia[A]",
+    "regex": "(corrente\\.average)\\.i([a-c])\\[A\\]",
+    "prefixo": "Fase ",
+    "tem_fase": true
   }
 }
