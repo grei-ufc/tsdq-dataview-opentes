@@ -33,10 +33,17 @@ def carregar_metadados(nome_arquivo="mapeamento.json"):
 def realizar_mapeamento_dinamico(df, config):
     """Varre as colunas e organiza os dados com base no JSON de metadados."""
     mapas = {grandeza: {} for grandeza in config.keys()}
-    padroes = {grandeza: re.compile(dados["regex"]) for grandeza, dados in config.items()}
+    # Compila os padrões regex, IGNORANDO as configurações de sistema que começam com "_"
+    padroes = {
+        grandeza: re.compile(dados["regex"]) 
+        for grandeza, dados in config.items() 
+        if not grandeza.startswith("_")
+    }
 
     for col in df.columns:
         for grandeza, dados in config.items():
+            if grandeza.startswith("_"):
+                continue
             match = padroes[grandeza].search(col)
             if match:
                 elemento = match.group(1) 
@@ -135,7 +142,7 @@ if uploaded_file:
     tem_fases = config_ativa["tem_fase"]
     label_y = grandeza 
 
-    pagina = st.sidebar.radio("Navegação:", ["Gráfico 2D", "Superfície 3D"])
+    pagina = st.sidebar.radio("Navegação:", ["Gráfico 2D", "Superfície 3D", "Mapa Geográfico"])
 
     # =======================================================
     # VISUALIZAÇÃO 2D
@@ -271,6 +278,74 @@ if uploaded_file:
             height=750
         )
         st.plotly_chart(fig_3d, use_container_width=True)
+
+# =======================================================
+    # VISUALIZAÇÃO GEOGRÁFICA (MAPA)
+    # =======================================================
+    elif pagina == "Mapa Geográfico":
+        st.header("🗺️ Visualização Geográfica do Sistema")
+        st.markdown("Faça o upload do ficheiro de coordenadas do seu circuito para visualizar a topologia da rede.")
+        
+        # 1. Puxa as regras de colunas do JSON (com valores padrão por segurança)
+        col_nome = "Barra"
+        col_x = "X"
+        col_y = "Y"
+        
+        if "_Configuracoes_Geograficas" in config_metadados:
+            config_geo = config_metadados["_Configuracoes_Geograficas"]
+            col_nome = config_geo.get("coluna_elemento", col_nome)
+            col_x = config_geo.get("coluna_x", col_x)
+            col_y = config_geo.get("coluna_y", col_y)
+            
+        st.info(f"ℹ️ **Padrão esperado pelo JSON:** Coluna do Elemento: `{col_nome}` | Eixo X: `{col_x}` | Eixo Y: `{col_y}`")
+
+        # 2. Componente de Upload Seguro (usando o parâmetro KEY)
+        arquivo_geo_upload = st.file_uploader(
+            "Selecione o ficheiro de coordenadas (CSV ou TXT)", 
+            type=["csv", "txt"], 
+            key="upload_coordenadas" # <-- O segredo para não haver conflitos!
+        )
+        
+        if arquivo_geo_upload is not None:
+            # 3. Lê os dados do ficheiro carregado
+            df_geo = pd.read_csv(arquivo_geo_upload)
+            
+            # 4. Verifica se as colunas configuradas no JSON realmente existem no ficheiro
+            if col_nome in df_geo.columns and col_x in df_geo.columns and col_y in df_geo.columns:
+                
+                fig_mapa = go.Figure()
+                
+                # Adiciona os pontos (barras/equipamentos) no gráfico
+                fig_mapa.add_trace(go.Scatter(
+                    x=df_geo[col_x],
+                    y=df_geo[col_y],
+                    mode='markers+text',
+                    text=df_geo[col_nome],
+                    textposition="top center",
+                    marker=dict(size=12, color='#2ECC71', line=dict(width=2, color='DarkSlateGrey')),
+                    name="Elementos da Rede",
+                    hoverinfo="text"
+                ))
+                
+                fig_mapa.update_layout(
+                    title="Topologia do Circuito",
+                    xaxis_title=f"Eixo X ({col_x})",
+                    yaxis_title=f"Eixo Y ({col_y})",
+                    height=750,
+                    template="plotly_white",
+                    # scaleanchor e scaleratio garantem que o mapa não fique achatado ou esticado
+                    yaxis=dict(scaleanchor="x", scaleratio=1) 
+                )
+                
+                st.plotly_chart(fig_mapa, use_container_width=True)
+                
+                with st.expander("📊 Ver Tabela de Coordenadas"):
+                    st.dataframe(df_geo)
+                    
+            else:
+                st.error("❌ O ficheiro carregado não possui as colunas esperadas!")
+                st.warning(f"O sistema procurou por: `{col_nome}`, `{col_x}` e `{col_y}` (conforme configurado no `mapeamento.json`).")
+                st.write("**Colunas encontradas no seu ficheiro:**", list(df_geo.columns))
 
     # =======================================================
     # TABELA DE DADOS

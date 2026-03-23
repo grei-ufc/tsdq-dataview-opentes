@@ -61,5 +61,11 @@
     "regex": "Grid-[\\w.-]+-(.+?)-q_mvar",
     "prefixo": "Q",
     "tem_fase": false
+  },
+  "_Configuracoes_Geograficas": {
+    "_instrucao_equipe": "Defina as colunas exatas que o seu ficheiro de coordenadas vai ter",
+    "coluna_elemento": "Barra",
+    "coluna_x": "X",
+    "coluna_y": "Y"
   }
 }
