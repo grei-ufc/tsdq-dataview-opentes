@@ -9,6 +9,38 @@ import os
 st.set_page_config(layout="wide", page_title="Visualizador OpenDSS - Tensão e Corrente")
 
 # =======================================================
+# UTILITÁRIO DE ESCALA (ADICIONAR LOGO APÓS OS IMPORTS)
+# =======================================================
+
+def auto_scale(value, unit):
+    if value == 0:
+        return 0, unit
+
+    exp = int(np.floor(np.log10(abs(value)) / 3) * 3)
+
+    scale_map = {
+        -6: ("u", 1e-6),
+        -3: ("m", 1e-3),
+         0: ("", 1),
+         3: ("k", 1e3),
+         6: ("M", 1e6),
+         9: ("G", 1e9),
+    }
+
+    exp = max(min(exp, 9), -6)
+
+    prefix, factor = scale_map.get(exp, ("", 1))
+
+    return value / factor, prefix + unit
+
+unit_map = {
+    "Potência Ativa": ("W", 1e6),
+    "Potência Reativa": ("var", 1e6),
+    "Tensão (pu)": ("pu", 1),
+    "Corrente": ("A", 1),
+}
+
+# =======================================================
 # FUNÇÕES DE PROCESSAMENTO E MAPEAMENTO
 # =======================================================
 
@@ -37,7 +69,7 @@ def realizar_mapeamento_dinamico(df, config):
     padroes = {
         grandeza: re.compile(dados["regex"]) 
         for grandeza, dados in config.items() 
-        if not grandeza.startswith("_")
+            if not grandeza.startswith("_")
     }
 
     for col in df.columns:
@@ -147,8 +179,9 @@ if uploaded_file:
     # =======================================================
     # VISUALIZAÇÃO 2D
     # =======================================================
+    
     if pagina == "Gráfico 2D":
-        # Função para deixar os nomes mais claros no menu
+
         def formatar_nome(nome):
             if nome.endswith('r') and prefixo == 'V':
                 return f"{nome} (Lado Secundário/Regulado)"
@@ -156,69 +189,133 @@ if uploaded_file:
                 return f"{nome} (Lado Primário da Fonte)"
             return nome
 
-        # Botão com os nomes formatados
         elemento = st.selectbox(
             f"Selecione o Elemento:", 
             options=sorted(mapa_ativo.keys()),
             format_func=formatar_nome
         )
-        
-        # Caixinha de aviso inteligente (Aparece só quando necessário)
-        if elemento.endswith('r') and prefixo == 'V':
-            st.info(f"💡 **Você sabia?** A barra **{elemento}** representa o lado secundário de um Regulador de Tensão. A tensão aqui já sofreu a correção do Tap em relação à barra **{elemento[:-1]}**.")
-        elif f"{elemento}r" in mapa_ativo.keys() and prefixo == 'V':
-            st.info(f"💡 **Dica:** Esta barra é o lado primário de um Regulador. Compare-a com a barra **{elemento}r** para ver o salto de tensão causado pelo Tap!")
 
         fig = go.Figure()
         cores_fases = {'1': '#FF4B4B', '2': '#1C83E1', '3': '#00CC96'}
-        
+
+        # DEFINIÇÃO DAS CHAVES
         chaves_para_plotar = [f"{prefixo}1", f"{prefixo}2", f"{prefixo}3"] if tem_fases else [prefixo]
+
+        # ESCALA GLOBAL
+        
+        coluna_exemplo = mapa_ativo[elemento][chaves_para_plotar[0]]
+
+        if "_mw" in coluna_exemplo.lower():
+            unidade_base = "W"
+            fator = 1e6
+        elif "_mvar" in coluna_exemplo.lower():
+            unidade_base = "var"
+            fator = 1e6
+        elif "_kw" in coluna_exemplo.lower():
+            unidade_base = "W"
+            fator = 1e3
+        elif "_w" in coluna_exemplo.lower():
+            unidade_base = "W"
+            fator = 1
+        elif "_pu" in coluna_exemplo.lower():
+            unidade_base = "pu"
+            fator = 1
+        elif "_a" in coluna_exemplo.lower():
+            unidade_base = "A"
+            fator = 1
+        else:
+            unidade_base = ""
+            fator = 1
+
+        # ESCALA GLOBAL CORRIGIDA
+        todos_valores = []
 
         for chave in chaves_para_plotar:
             if chave in mapa_ativo[elemento]:
-                # Captura os dados numéricos dessa curva
+                dados_temp = df[mapa_ativo[elemento][chave]] * fator
+                todos_valores.append(dados_temp.abs().max())
+
+        valor_referencia = max(todos_valores) if todos_valores else 0
+
+        if valor_referencia > 0:
+            if unidade_base in ["W", "var"] and valor_referencia < 1:
+                unidade_final = unidade_base
+                fator_escala_global = 1
+            else:
+                valor_ref_scaled, unidade_final = auto_scale(valor_referencia, unidade_base)
+                fator_escala_global = valor_referencia / valor_ref_scaled
+        else:
+            unidade_final = unidade_base
+            fator_escala_global = 1
+
+        for chave in chaves_para_plotar:
+            if chave in mapa_ativo[elemento]:
                 dados_y = df[mapa_ativo[elemento][chave]]
-                val_min = dados_y.min()
-                val_max = dados_y.max()
-                
-                # NOVO: Trocamos .3f por .5g para exibir valores minúsculos com precisão!
+
+                dados_convertidos = dados_y * fator
+                dados_plot = dados_convertidos / fator_escala_global
+
+                val_min = dados_plot.min()
+                val_max = dados_plot.max()
+
+                cor_linha = '#000000'  # padrão (preto)
+
                 if tem_fases:
                     nome_legenda = f"Fase {chave[-1]} (Mín: {val_min:.5g} | Máx: {val_max:.5g})"
-                    cor_linha = cores_fases.get(chave[-1], '#000')
+                    cor_linha = cores_fases.get(chave[-1], '#000000')
                     formato_linha = 'linear'
                 else:
-                    nome_legenda = f"{grandeza} (Mín: {val_min:.5g} | Máx: {val_max:.5g})"
+                    nome_legenda = f"{elemento} (Mín: {val_min:.5g} | Máx: {val_max:.5g})"
                     cor_linha = '#9B59B6' if prefixo == 'Tap' else '#F39C12'
                     formato_linha = 'hv' if prefixo == 'Tap' else 'linear'
-                
+
                 fig.add_trace(go.Scatter(
-                    x=df[col_time], y=dados_y,
-                    mode='lines', name=nome_legenda, line=dict(color=cor_linha),
+                    x=df[col_time],
+                    y=dados_plot,
+                    mode='lines',
+                    name=nome_legenda,
+                    line=dict(color=cor_linha),
                     line_shape=formato_linha
                 ))
 
-        # Adiciona limites clicáveis do PRODIST apenas se for Tensão
+        # LIMITES PRODIST
         if grandeza == "Tensão (pu)":
             tempo_min = df[col_time].min()
             tempo_max = df[col_time].max()
-            fig.add_trace(go.Scatter(x=[tempo_min, tempo_max], y=[1.05, 1.05], mode='lines', name='🚨 Limite Sup. (1.05)', line=dict(color='red', dash='dash'), visible='legendonly'))
-            fig.add_trace(go.Scatter(x=[tempo_min, tempo_max], y=[0.92, 0.92], mode='lines', name='🚨 Limite Inf. (0.92)', line=dict(color='orange', dash='dash'), visible='legendonly'))
 
-        # A Mágica do Eixo Y Automático e Inteligente
+            fig.add_trace(go.Scatter(
+                x=[tempo_min, tempo_max],
+                y=[1.05, 1.05],
+                mode='lines',
+                name='🚨 Limite Sup. (1.05)',
+                line=dict(color='red', dash='dash'),
+                visible='legendonly'
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=[tempo_min, tempo_max],
+                y=[0.92, 0.92],
+                mode='lines',
+                name='🚨 Limite Inf. (0.92)',
+                line=dict(color='orange', dash='dash'),
+                visible='legendonly'
+            ))
+
         fig.update_layout(
-            title=f"{grandeza} - {elemento}", 
+            title=f"{grandeza} - {elemento}",
             yaxis=dict(
-                title=label_y,
+                title=f"{grandeza} [{unidade_final}]",
                 autorange=True,
                 nticks=12,
-                tickformat=".5g",  # <-- NOVO: Força o Plotly a mostrar micro-variações no eixo Y
-                zeroline=False     # <-- NOVO: Desligamos a linha do zero para ela não esmagar o zoom
+                tickformat=".5g",
+                zeroline=False
             ),
             xaxis_title="Tempo",
-            template="plotly_white", 
+            template="plotly_white",
             height=600,
             hovermode="x unified"
         )
+
         st.plotly_chart(fig, use_container_width=True)
 
     # =======================================================
