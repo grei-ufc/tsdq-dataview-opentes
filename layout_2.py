@@ -19,15 +19,14 @@ def auto_scale(value, unit):
     exp = int(np.floor(np.log10(abs(value)) / 3) * 3)
 
     scale_map = {
-        -6: ("u", 1e-6),
         -3: ("m", 1e-3),
-         0: ("", 1),
-         3: ("k", 1e3),
-         6: ("M", 1e6),
-         9: ("G", 1e9),
+        0: ("", 1),
+        3: ("k", 1e3),
+        6: ("M", 1e6),
+        9: ("G", 1e9),
     }
 
-    exp = max(min(exp, 9), -6)
+    exp = max(min(exp, 9), -3)
 
     prefix, factor = scale_map.get(exp, ("", 1))
 
@@ -203,24 +202,32 @@ if uploaded_file:
 
         # ESCALA GLOBAL
         
-        coluna_exemplo = mapa_ativo[elemento][chaves_para_plotar[0]]
+        primeira_chave_valida = next((c for c in chaves_para_plotar if c in mapa_ativo[elemento]), None)
 
-        if "_mw" in coluna_exemplo.lower():
+        coluna_exemplo = mapa_ativo[elemento][primeira_chave_valida]
+
+        if "_MW" in coluna_exemplo:
             unidade_base = "W"
             fator = 1e6
-        elif "_mvar" in coluna_exemplo.lower():
+        elif "_MVar" in coluna_exemplo:
             unidade_base = "var"
             fator = 1e6
-        elif "_kw" in coluna_exemplo.lower():
+        elif "_kW" in coluna_exemplo:
             unidade_base = "W"
             fator = 1e3
-        elif "_w" in coluna_exemplo.lower():
+        elif "_W" in coluna_exemplo:
             unidade_base = "W"
             fator = 1
-        elif "_pu" in coluna_exemplo.lower():
+        elif "_pu" in coluna_exemplo:
             unidade_base = "pu"
             fator = 1
-        elif "_a" in coluna_exemplo.lower():
+        elif "_kV" in coluna_exemplo:
+            unidade_base = "V"
+            fator = 1e3
+        elif "_V" in coluna_exemplo:
+            unidade_base = "V"
+            fator = 1
+        elif "_A" in coluna_exemplo:
             unidade_base = "A"
             fator = 1
         else:
@@ -279,7 +286,7 @@ if uploaded_file:
                 ))
 
         # LIMITES PRODIST
-        if grandeza == "Tensão (pu)":
+        if grandeza == "Tensão":
             tempo_min = df[col_time].min()
             tempo_max = df[col_time].max()
 
@@ -301,10 +308,12 @@ if uploaded_file:
                 visible='legendonly'
             ))
 
+        nome_limpo = re.sub(r"\s*\(.*?\)", "", grandeza)
+
         fig.update_layout(
             title=f"{grandeza} - {elemento}",
             yaxis=dict(
-                title=f"{grandeza} [{unidade_final}]",
+                title=f"{nome_limpo} [{unidade_final}]",
                 autorange=True,
                 nticks=12,
                 tickformat=".5g",

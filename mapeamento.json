@@ -1,8 +1,8 @@
 {
-  "Tensão ": {
+  "Tensão": {
     "_instrucao_equipe": "Aceita formato nativo do OpenDSS ou limpo. Padrão: (Bus-){NOME}-V{FASE}_pu",
     "_exemplo": "Bus-UNTRS_039281-V1_pu ou UNTRS_039281-V1_pu",
-    "regex": "(?:Bus-)?(.+?)-V(\\d+)_pu",
+    "regex": "(?:Bus-)?(.+?)-V(\\d+)_(pu|kV|V)",
     "prefixo": "V",
     "tem_fase": true
   },
@@ -27,10 +27,10 @@
     "prefixo": "Tap",
     "tem_fase": false
   },
-  "Potência do Gerador (W)": {
-    "_instrucao_equipe": "Aceita formato nativo do OpenDSS ou limpo. Padrão: (Generator-){NOME}-P_mw",
-    "_exemplo": "Generator-Gen_0-P_mw ou Gen_0-P_mw",
-    "regex": "(?:Generator-)?(.+?)-P_mw",
+  "Potência do Gerador (MW)": {
+    "_instrucao_equipe": "Aceita formato nativo do OpenDSS ou limpo. Padrão: (Generator-){NOME}-P_MW",
+    "_exemplo": "Generator-Gen_0-P_MW ou Gen_0-P_MW",
+    "regex": "(?:Generator-)?(.+?)-P_MW",
     "prefixo": "P",
     "tem_fase": false
   },
@@ -48,17 +48,17 @@
     "prefixo": "P",
     "tem_fase": false
   },
-  "Potência Ativa da Rede (W)": {
-    "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-p_mw",
-    "_exemplo": "Grid-0.0-LV2.101 Bus 19-p_mw ou LV2.101 Bus 19-p_mw",
-    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-p_mw",
+  "Potência Ativa da Rede (MW)": {
+    "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-p_MW",
+    "_exemplo": "Grid-0.0-LV2.101 Bus 19-p_MW ou LV2.101 Bus 19-p_MW",
+    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-p_MW",
     "prefixo": "P",
     "tem_fase": false
   },
-  "Potência Reativa da Rede (VAr)": {
-    "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-q_mvar",
-    "_exemplo": "Grid-0.0-LV2.101 Bus 28-q_mvar ou LV2.101 Bus 28-q_mvar",
-    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-q_mvar",
+  "Potência Reativa da Rede (MVAr)": {
+    "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-q_MVar",
+    "_exemplo": "Grid-0.0-LV2.101 Bus 28-q_MVar ou LV2.101 Bus 28-q_MVar",
+    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-q_MVar",
     "prefixo": "Q",
     "tem_fase": false
   },
