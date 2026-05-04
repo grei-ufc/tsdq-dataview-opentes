@@ -49,16 +49,16 @@
     "tem_fase": false
   },
   "Potência Ativa da Rede (MW)": {
-    "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-p_MW",
-    "_exemplo": "Grid-0.0-LV2.101 Bus 19-p_MW ou LV2.101 Bus 19-p_MW",
-    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-p_MW",
+    "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-P_MW",
+    "_exemplo": "Grid-0.0-LV2.101 Bus 19-P_MW ou LV2.101 Bus 19-P_MW",
+    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-P_MW",
     "prefixo": "P",
     "tem_fase": false
   },
   "Potência Reativa da Rede (MVAr)": {
-    "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-q_MVar",
-    "_exemplo": "Grid-0.0-LV2.101 Bus 28-q_MVar ou LV2.101 Bus 28-q_MVar",
-    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-q_MVar",
+    "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-Q_MVar",
+    "_exemplo": "Grid-0.0-LV2.101 Bus 28-q_MVar ou LV2.101 Bus 28-Q_MVar",
+    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-Q_MVar",
     "prefixo": "Q",
     "tem_fase": false
   },
