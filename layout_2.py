@@ -79,7 +79,8 @@ def realizar_mapeamento_dinamico(df, config):
             if match:
                 elemento = match.group(1) 
                 if dados["tem_fase"]:
-                    fase = f"{dados['prefixo']}{match.group(2)}"
+                    fase_num = match.group(2)
+                    fase = f"{dados['prefixo']}{fase_num}" if fase_num else dados["prefixo"]
                 else:
                     fase = dados["prefixo"]
                 
@@ -198,7 +199,10 @@ if uploaded_file:
         cores_fases = {'1': '#FF4B4B', '2': '#1C83E1', '3': '#00CC96'}
 
         # DEFINIÇÃO DAS CHAVES
-        chaves_para_plotar = [f"{prefixo}1", f"{prefixo}2", f"{prefixo}3"] if tem_fases else [prefixo]
+        if tem_fases:
+            chaves_para_plotar = [f"{prefixo}1", f"{prefixo}2", f"{prefixo}3", prefixo]
+        else:
+            chaves_para_plotar = [prefixo]
 
         # ESCALA GLOBAL
         
@@ -212,6 +216,16 @@ if uploaded_file:
         elif "_MVar" in coluna_exemplo:
             unidade_base = "var"
             fator = 1e6
+        elif "P_gen" in coluna_exemplo:
+            if "_MW" in coluna_exemplo:
+                unidade_base = "W"
+                fator = 1e6
+            elif "_kW" in coluna_exemplo:
+                unidade_base = "W"
+                fator = 1e3
+            else:
+                unidade_base = "W"
+                fator = 1
         elif "_kW" in coluna_exemplo:
             unidade_base = "W"
             fator = 1e3
