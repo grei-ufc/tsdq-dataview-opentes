@@ -324,11 +324,30 @@ if uploaded_file:
 
         nome_limpo = re.sub(r"\s*\(.*?\)", "", grandeza)
 
+        # LIMITE DINÂMICO LOCAL (por elemento)
+        y_min = float('inf')
+        y_max = float('-inf')
+
+        for chave in chaves_para_plotar:
+            if chave in mapa_ativo[elemento]:
+                dados_y = df[mapa_ativo[elemento][chave]] * fator
+                dados_plot = dados_y / fator_escala_global
+
+                y_min = min(y_min, dados_plot.min())
+                y_max = max(y_max, dados_plot.max())
+
+        # proteção contra erro
+        if y_min == float('inf') or y_max == float('-inf'):
+            y_min, y_max = 0, 1
+
+        # margem de 5%
+        margem = 0.05 * (y_max - y_min) if y_max != y_min else 0.01
+
         fig.update_layout(
             title=f"{grandeza} - {elemento}",
             yaxis=dict(
                 title=f"{nome_limpo} [{unidade_final}]",
-                autorange=True,
+                range=[y_min - margem, y_max + margem],
                 nticks=12,
                 tickformat=".5g",
                 zeroline=False
