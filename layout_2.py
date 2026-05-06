@@ -174,7 +174,10 @@ if uploaded_file:
     tem_fases = config_ativa["tem_fase"]
     label_y = grandeza 
 
-    pagina = st.sidebar.radio("Navegação:", ["Gráfico 2D", "Superfície 3D", "Mapa Geográfico"])
+    pagina = st.sidebar.radio(
+        "Navegação:",
+        ["Gráfico 2D", "Superfície 3D", "Mapa Geográfico", "Comunicação"]
+    )
 
     # =======================================================
     # VISUALIZAÇÃO 2D
@@ -418,7 +421,7 @@ if uploaded_file:
         )
         st.plotly_chart(fig_3d, use_container_width=True)
 
-# =======================================================
+    # =======================================================
     # VISUALIZAÇÃO GEOGRÁFICA (MAPA)
     # =======================================================
     elif pagina == "Mapa Geográfico":
@@ -485,7 +488,96 @@ if uploaded_file:
                 st.error("❌ O ficheiro carregado não possui as colunas esperadas!")
                 st.warning(f"O sistema procurou por: `{col_nome}`, `{col_x}` e `{col_y}` (conforme configurado no `mapeamento.json`).")
                 st.write("**Colunas encontradas no seu ficheiro:**", list(df_geo.columns))
+    # =======================================================
+    # VISUALIZAÇÃO DE COMUNICAÇÃO (OMNeT)
+    # =======================================================
+    elif pagina == "Comunicação":
+        st.header("📡 Comunicação - OMNeT++")
 
+        arquivo_com = st.file_uploader(
+            "Selecione o arquivo de comunicação (results.csv)",
+            type=["csv"],
+            key="upload_comunicacao"
+        )
+
+        if arquivo_com is not None:
+            # leitura
+            df_com = pd.read_csv(arquivo_com)
+
+            # limpeza
+            df_com.columns = df_com.columns.str.strip()
+
+            # validação do seu padrão
+            colunas_necessarias = ["Tempo", "Origem", "Atributo", "Valor"]
+
+            if all(col in df_com.columns for col in colunas_necessarias):
+
+                # conversões
+                df_com["Tempo"] = pd.to_numeric(df_com["Tempo"], errors="coerce")
+                df_com["Valor_num"] = pd.to_numeric(df_com["Valor"], errors="coerce")
+
+                # remove inválidos
+                df_com = df_com.dropna(subset=["Tempo", "Valor_num"])
+
+                # cria variável
+                df_com["variavel"] = df_com["Origem"] + " | " + df_com["Atributo"]
+
+                # pivot correto
+                df_pivot = df_com.pivot_table(
+                    index="Tempo",
+                    columns="variavel",
+                    values="Valor_num",
+                    aggfunc="mean"
+                ).reset_index()
+
+                df_pivot = df_pivot.sort_values("Tempo")
+
+                st.success("Arquivo de comunicação carregado corretamente.")
+
+            else:
+                st.error(f"""
+            Formato inválido.
+
+            Esperado:
+            Tempo | Origem | Atributo | Valor
+
+            Encontrado:
+            {list(df_com.columns)}
+            """)
+                st.stop()
+
+                # seleção de variável
+                st.success("Arquivo de comunicação carregado corretamente.")
+
+                colunas_validas = [
+                    c for c in df_pivot.columns
+                    if c != "Tempo" and df_pivot[c].notna().sum() > 0
+                ]
+
+                if len(colunas_validas) == 0:
+                    st.warning("Nenhuma variável numérica disponível para plotagem.")
+                    st.stop()
+
+                variavel = st.selectbox(
+                    "Selecione a variável",
+                    colunas_validas
+                )
+
+                fig = go.Figure()
+
+                fig.add_trace(go.Scatter(
+                    x=df_pivot["Tempo"],
+                    y=df_pivot[variavel],
+                    mode='lines',
+                    name=variavel
+                ))
+
+                st.plotly_chart(fig, use_container_width=True)
+
+                with st.expander("📊 Ver dados de comunicação"):
+                    st.dataframe(df_pivot)
+            #else:
+            #    st.error("Formato do arquivo OMNeT inválido (esperado: colunas 'time' e 'value').")
     # =======================================================
     # TABELA DE DADOS
     # =======================================================
