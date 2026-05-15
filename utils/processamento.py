@@ -54,10 +54,7 @@ def preparar_serie_temporal(
         errors="coerce"
     )
 
-    df_plot["Valor"] = (
-        df_plot["Valor"]
-        .map(lambda x: f"{x:.16f}")
-    )
+    
 
     tipo = variavel_info["tipo"]
 

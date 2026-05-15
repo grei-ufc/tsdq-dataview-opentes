@@ -10,7 +10,10 @@ from utils.processamento import (
 )
 import plotly.express as px
 from components.uploader import render_upload
-
+from utils.prodist import (
+    obter_limites_prodist
+)
+from utils.escalas import auto_scale
 
 st.set_page_config(
     page_title="Análise Elétrica",
@@ -128,7 +131,60 @@ if uploaded_file is not None:
 
     df_plot = dados_plot["df_plot"]
 
-    label_y = dados_plot["label_y"]
+    valor_maximo = (
+        df_plot["Valor"]
+        .abs()
+        .max()
+    )
+
+    unidade_original = (
+        variavel_info.get(
+            "unidade_detectada"
+        )
+    )
+
+    fator_escala = 1
+
+    unidade_final = unidade_original
+
+    unidades_base = [
+        "V",
+        "W",
+        "A",
+        "var",
+        "VA"
+    ]
+
+    if unidade_original in unidades_base:
+
+        (
+            _,
+            unidade_final,
+            fator_escala
+        ) = auto_scale(
+            valor_maximo,
+            unidade_original
+        )
+
+        df_plot["Valor"] = (
+            df_plot["Valor"]
+            / fator_escala
+        )
+
+    tipo_variavel = variavel_info[
+        "tipo"
+    ]
+
+    if unidade_final:
+
+        label_grafico = (
+            f"{tipo_variavel} "
+            f"[{unidade_final}]"
+        )
+
+    else:
+
+        label_grafico = tipo_variavel
 
     coluna_real = dados_plot[
         "coluna_real"
@@ -149,11 +205,51 @@ if uploaded_file is not None:
         title=coluna_real
     )
 
+    if (
+        variavel_info["tipo"] == "Tensão"
+        and
+        variavel_info.get(
+            "unidade_detectada"
+        ) == "pu"
+    ):
+
+        limites = obter_limites_prodist()
+
+        tempo_min = df_plot[
+            "Tempo"
+        ].min()
+
+        tempo_max = df_plot[
+            "Tempo"
+        ].max()
+
+        fig.add_hline(
+
+            y=limites["adequado_max"],
+
+            line_dash="dash",
+
+            line_color="red",
+
+            annotation_text="Limite Sup. PRODIST"
+        )
+
+        fig.add_hline(
+
+            y=limites["adequado_min"],
+
+            line_dash="dash",
+
+            line_color="orange",
+
+            annotation_text="Limite Inf. PRODIST"
+        )
+
     fig.update_layout(
 
         xaxis_title="Tempo",
 
-        yaxis_title=label_y,
+        yaxis_title=label_grafico,
 
         hovermode="x unified"
     )
@@ -193,13 +289,45 @@ if uploaded_file is not None:
             y=colunas_plot
         )
 
+        if (
+            variavel_info["tipo"] == "Tensão"
+            and
+            variavel_info.get(
+                "unidade_detectada"
+            ) == "pu"
+        ):
+
+            limites = obter_limites_prodist()
+
+            fig_multiserie.add_hline(
+
+                y=limites["adequado_max"],
+
+                line_dash="dash",
+
+                line_color="red",
+
+                annotation_text="Limite Sup. PRODIST"
+            )
+
+            fig_multiserie.add_hline(
+
+                y=limites["adequado_min"],
+
+                line_dash="dash",
+
+                line_color="orange",
+
+                annotation_text="Limite Inf. PRODIST"
+            )
+
         fig_multiserie.update_layout(
 
             title="Variáveis combinadas",
 
             xaxis_title="Tempo",
 
-            yaxis_title=label_y,
+            yaxis_title=label_grafico,
 
             hovermode="x unified"
         )
@@ -221,7 +349,15 @@ if uploaded_file is not None:
         "Série selecionada"
     ):
 
-        st.dataframe(df_plot)
+        st.dataframe(
+
+            df_plot.style.format({
+
+                "Valor": "{:.16f}"
+
+            })
+
+        )
 
     with st.expander(
         "Base completa do dataset"

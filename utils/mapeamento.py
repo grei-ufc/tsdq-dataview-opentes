@@ -69,8 +69,15 @@ def mapear_colunas(colunas, mapeamento):
 
                         fase = fase_raw.upper()
 
-            if len(grupos) >= 3:
-                unidade = grupos[2]
+            if dados.get("tem_fase"):
+
+                if len(grupos) >= 3:
+                    unidade = grupos[2]
+
+            else:
+
+                if len(grupos) >= 2:
+                    unidade = grupos[1]
 
             resultado[coluna] = {
 
