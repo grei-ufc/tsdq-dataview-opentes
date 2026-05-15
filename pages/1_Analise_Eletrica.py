@@ -8,12 +8,15 @@ from utils.processamento import (
     preparar_serie_temporal,
     preparar_multiplas_series
 )
-import plotly.express as px
 from components.uploader import render_upload
 from utils.prodist import (
     obter_limites_prodist
 )
 from utils.escalas import auto_scale
+from components.graficos import (
+    render_grafico_individual,
+    render_grafico_multiserie
+)
 
 st.set_page_config(
     page_title="Análise Elétrica",
@@ -198,71 +201,13 @@ if uploaded_file is not None:
 
         col_esquerda = st.container()
 
-    fig = px.line(
-        df_plot,
-        x="Tempo",
-        y="Valor",
-        title=coluna_real
-    )
-
-    if (
-        variavel_info["tipo"] == "Tensão"
-        and
-        variavel_info.get(
-            "unidade_detectada"
-        ) == "pu"
-    ):
-
-        limites = obter_limites_prodist()
-
-        tempo_min = df_plot[
-            "Tempo"
-        ].min()
-
-        tempo_max = df_plot[
-            "Tempo"
-        ].max()
-
-        fig.add_hline(
-
-            y=limites["adequado_max"],
-
-            line_dash="dash",
-
-            line_color="red",
-
-            annotation_text="Limite Sup. PRODIST"
-        )
-
-        fig.add_hline(
-
-            y=limites["adequado_min"],
-
-            line_dash="dash",
-
-            line_color="orange",
-
-            annotation_text="Limite Inf. PRODIST"
-        )
-
-    fig.update_layout(
-
-        xaxis_title="Tempo",
-
-        yaxis_title=label_grafico,
-
-        hovermode="x unified"
-    )
-
     with col_esquerda:
 
-        st.subheader(
-            "Série Temporal"
-        )
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True
+        render_grafico_individual(
+            df_plot,
+            coluna_real,
+            label_grafico,
+            variavel_info
         )
 
     if len(opcoes_unicas) > 1:
@@ -272,78 +217,15 @@ if uploaded_file is not None:
                 df,
                 variaveis
             )
-        )
-
-        colunas_plot = [
-
-            coluna
-
-            for coluna in df_multiserie.columns
-
-            if coluna != "Tempo"
-        ]
-
-        fig_multiserie = px.line(
-            df_multiserie,
-            x="Tempo",
-            y=colunas_plot
-        )
-
-        if (
-            variavel_info["tipo"] == "Tensão"
-            and
-            variavel_info.get(
-                "unidade_detectada"
-            ) == "pu"
-        ):
-
-            limites = obter_limites_prodist()
-
-            fig_multiserie.add_hline(
-
-                y=limites["adequado_max"],
-
-                line_dash="dash",
-
-                line_color="red",
-
-                annotation_text="Limite Sup. PRODIST"
-            )
-
-            fig_multiserie.add_hline(
-
-                y=limites["adequado_min"],
-
-                line_dash="dash",
-
-                line_color="orange",
-
-                annotation_text="Limite Inf. PRODIST"
-            )
-
-        fig_multiserie.update_layout(
-
-            title="Variáveis combinadas",
-
-            xaxis_title="Tempo",
-
-            yaxis_title=label_grafico,
-
-            hovermode="x unified"
-        )
+        )    
 
         with col_direita:
 
-            st.subheader(
-                "Visualização conjunta"
+            render_grafico_multiserie(
+                df_multiserie,
+                label_grafico,
+                variavel_info
             )
-
-            st.plotly_chart(
-                fig_multiserie,
-                use_container_width=True
-            )
-
-    
 
     with st.expander(
         "Série selecionada"
