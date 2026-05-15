@@ -49,6 +49,16 @@ def preparar_serie_temporal(
         "Valor"
     ]
 
+    df_plot["Valor"] = pd.to_numeric(
+        df_plot["Valor"],
+        errors="coerce"
+    )
+
+    df_plot["Valor"] = (
+        df_plot["Valor"]
+        .map(lambda x: f"{x:.16f}")
+    )
+
     tipo = variavel_info["tipo"]
 
     unidade = variavel_info.get(
@@ -68,3 +78,34 @@ def preparar_serie_temporal(
 
         "coluna_real": coluna_real
     }
+
+def preparar_multiplas_series(
+    df,
+    variaveis
+):
+    """
+    Prepara dataframe multivariável.
+    """
+
+    df_multiserie = pd.DataFrame()
+
+    df_multiserie["Tempo"] = df[
+        "Tempo_EixoX"
+    ]
+
+    for variavel in variaveis:
+
+        coluna = variavel[
+            "coluna_original"
+        ]
+
+        nome_coluna = coluna
+
+        df_multiserie[
+            nome_coluna
+        ] = pd.to_numeric(
+            df[coluna],
+            errors="coerce"
+        )
+
+    return df_multiserie

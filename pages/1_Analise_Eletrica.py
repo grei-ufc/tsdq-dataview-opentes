@@ -5,9 +5,11 @@ from utils.mapeamento import carregar_mapeamento
 from utils.mapeamento import mapear_colunas
 from utils.processamento import (
     organizar_variaveis,
-    preparar_serie_temporal
+    preparar_serie_temporal,
+    preparar_multiplas_series
 )
 import plotly.express as px
+from components.uploader import render_upload
 
 
 st.set_page_config(
@@ -23,40 +25,11 @@ provenientes de simulações elétricas.
 """)
 
 
-if "arquivo_eletrico" not in st.session_state:
-
-    st.session_state.arquivo_eletrico = None
-
-if st.session_state.arquivo_eletrico is None:
-
-    uploaded_file = st.file_uploader(
-        "Carregue o arquivo CSV",
-        type=["csv"]
-    )
-
-    if uploaded_file is not None:
-
-        st.session_state.arquivo_eletrico = (
-            uploaded_file
-        )
-
-        st.rerun()
-
-else:
-
-    uploaded_file = (
-        st.session_state.arquivo_eletrico
-    )
-
-    st.info(
-        f"Arquivo carregado: {uploaded_file.name}"
-    )
-
-    if st.button("Carregar novo arquivo"):
-
-        st.session_state.arquivo_eletrico = None
-
-        st.rerun()
+uploaded_file = render_upload(
+    session_key="arquivo_eletrico",
+    label="Carregue o arquivo CSV",
+    file_types=["csv"]
+)
 
 
 if uploaded_file is not None:
@@ -127,7 +100,11 @@ if uploaded_file is not None:
 
         opcoes_variaveis.append(nome)
 
-    if len(variaveis) == 1:
+    opcoes_unicas = list(
+        dict.fromkeys(opcoes_variaveis)
+    )
+
+    if len(opcoes_unicas) == 1:
 
         variavel_info = variaveis[0]
 
@@ -135,7 +112,7 @@ if uploaded_file is not None:
 
         variavel_escolhida = st.selectbox(
             "Variável",
-            opcoes_variaveis
+            opcoes_unicas
         )
 
         indice = opcoes_variaveis.index(
@@ -155,19 +132,15 @@ if uploaded_file is not None:
 
     coluna_real = dados_plot[
         "coluna_real"
-    ]
+    ]   
 
-    with st.expander(
-        "Pré-visualização em código"
-    ):
+    if len(opcoes_unicas) > 1:
 
-        st.json(variavel_info)
+        col_esquerda, col_direita = st.columns(2)
 
-    st.subheader("Pré-visualização da Série")
+    else:
 
-    st.dataframe(
-        df_plot.head(10)
-    )
+        col_esquerda = st.container()
 
     fig = px.line(
         df_plot,
@@ -185,13 +158,79 @@ if uploaded_file is not None:
         hovermode="x unified"
     )
 
-    st.subheader("Série Temporal")
+    with col_esquerda:
 
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
+        st.subheader(
+            "Série Temporal"
+        )
 
-    st.subheader("Pré-visualização Completa")
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
 
-    st.dataframe(df)
+    if len(opcoes_unicas) > 1:
+
+        df_multiserie = (
+            preparar_multiplas_series(
+                df,
+                variaveis
+            )
+        )
+
+        colunas_plot = [
+
+            coluna
+
+            for coluna in df_multiserie.columns
+
+            if coluna != "Tempo"
+        ]
+
+        fig_multiserie = px.line(
+            df_multiserie,
+            x="Tempo",
+            y=colunas_plot
+        )
+
+        fig_multiserie.update_layout(
+
+            title="Variáveis combinadas",
+
+            xaxis_title="Tempo",
+
+            yaxis_title=label_y,
+
+            hovermode="x unified"
+        )
+
+        with col_direita:
+
+            st.subheader(
+                "Visualização conjunta"
+            )
+
+            st.plotly_chart(
+                fig_multiserie,
+                use_container_width=True
+            )
+
+    
+
+    with st.expander(
+        "Série selecionada"
+    ):
+
+        st.dataframe(df_plot)
+
+    with st.expander(
+        "Base completa do dataset"
+    ):
+
+        st.dataframe(df)
+
+    with st.expander(
+        "Pré-visualização em código"
+    ):
+
+        st.json(variavel_info)
