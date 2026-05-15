@@ -1,0 +1,92 @@
+import json
+import re
+
+
+def carregar_mapeamento():
+
+    with open(
+        "configs/mapeamento.json",
+        "r",
+        encoding="utf-8"
+    ) as arquivo:
+
+        return json.load(arquivo)
+
+
+def mapear_colunas(colunas, mapeamento):
+    """
+    Mapeia semanticamente as colunas do CSV.
+    """
+
+    resultado = {}
+
+    for coluna in colunas:
+
+        coluna_limpa = coluna.strip()
+
+        for tipo, dados in mapeamento.items():
+
+            if tipo.startswith("_"):
+                continue
+
+            regex = dados.get("regex")
+
+            if not regex:
+                continue
+
+            match = re.match(
+                regex,
+                coluna_limpa,
+                re.IGNORECASE
+            )
+
+            if not match:
+                continue
+
+            grupos = match.groups()
+
+            elemento = grupos[0].strip()
+
+            fase = None
+            unidade = None
+
+            if dados.get("tem_fase") and len(grupos) >= 2:
+
+                fase_raw = grupos[1]
+
+                if fase_raw:
+
+                    if not fase_raw.upper().startswith(
+                        dados.get("prefixo", "").upper()
+                    ):
+
+                        fase = (
+                            dados.get("prefixo", "")
+                            + fase_raw.upper()
+                        )
+
+                    else:
+
+                        fase = fase_raw.upper()
+
+            if len(grupos) >= 3:
+                unidade = grupos[2]
+
+            resultado[coluna] = {
+
+                "tipo": tipo,
+
+                "elemento": elemento,
+
+                "fase": fase,
+
+                "unidade_detectada": unidade,
+
+                "coluna_original": coluna,
+
+                "metadados": dados
+            }
+
+            break
+
+    return resultado
