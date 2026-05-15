@@ -17,6 +17,11 @@ from components.graficos import (
     render_grafico_individual,
     render_grafico_multiserie
 )
+from components.tabelas import (
+    render_tabela_serie,
+    render_tabela_dataset,
+    render_codigo_variavel
+)
 
 st.set_page_config(
     page_title="Análise Elétrica",
@@ -227,28 +232,14 @@ if uploaded_file is not None:
                 variavel_info
             )
 
-    with st.expander(
-        "Série selecionada"
-    ):
+    render_tabela_serie(
+        df_plot
+    )
 
-        st.dataframe(
+    render_tabela_dataset(
+        df
+    )
 
-            df_plot.style.format({
-
-                "Valor": "{:.16f}"
-
-            })
-
-        )
-
-    with st.expander(
-        "Base completa do dataset"
-    ):
-
-        st.dataframe(df)
-
-    with st.expander(
-        "Pré-visualização em código"
-    ):
-
-        st.json(variavel_info)
+    render_codigo_variavel(
+        variavel_info
+    )
