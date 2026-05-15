@@ -216,7 +216,7 @@ if uploaded_file:
         if "_MW" in coluna_exemplo:
             unidade_base = "W"
             fator = 1e6
-        elif "_MVar" in coluna_exemplo:
+        elif "_Mvar" in coluna_exemplo:
             unidade_base = "var"
             fator = 1e6
         elif "P_gen" in coluna_exemplo:

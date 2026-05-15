@@ -2,21 +2,21 @@
   "Tensão": {
     "_instrucao_equipe": "Aceita formato nativo do OpenDSS ou limpo. Padrão: (Bus-){NOME}-V{FASE}_pu",
     "_exemplo": "Bus-UNTRS_039281-V1_pu ou UNTRS_039281-V1_pu",
-    "regex": "(?:Bus-)?(.+?)-V(\\d*)_(pu|kV|V)",
+    "regex": "(?:Bus-)?(.+?)-[vV](\\d*)_(pu|kV|V)",
     "prefixo": "V",
     "tem_fase": true
   },
   "Corrente (A)": {
     "_instrucao_equipe": "Aceita formato nativo do OpenDSS ou limpo. Padrão: (Line-){NOME}-I{FASE}_A",
     "_exemplo": "Line-LT_500_XINGU-I2_A ou LT_500_XINGU-I2_A",
-    "regex": "(?:Line-)?(.+?)-I(\\d+)_A",
+    "regex": "(?:Line-)?(.+?)-[iI](\\d+)_A",
     "prefixo": "I",
     "tem_fase": true
   },
   "Ângulo de Corrente (°)": {
     "_instrucao_equipe": "Aceita formato nativo do OpenDSS ou limpo. Padrão: (Line-){NOME}-I{FASE}_ang",
     "_exemplo": "Line-LT_500_XINGU-I2_ang ou LT_500_XINGU-I2_ang",
-    "regex": "(?:Line-)?(.+?)-I(\\d+)_ang",
+    "regex": "(?:Line-)?(.+?)-[iI](\\d+)_ang",
     "prefixo": "I",
     "tem_fase": true
   },
@@ -30,7 +30,7 @@
   "Potência do Gerador (MW)": {
     "_instrucao_equipe": "Aceita formato nativo do OpenDSS ou limpo. Padrão: (Generator-){NOME}-P_MW",
     "_exemplo": "Generator-Gen_0-P_MW ou Gen_0-P_MW",
-    "regex": "(?:Generator-)(.+?)-P_MW",
+    "regex": "(?:Generator-)(.+?)-[pP]_MW",
     "prefixo": "P",
     "tem_fase": false
   },
@@ -44,21 +44,21 @@
   "Potência Fotovoltaica": {
     "_instrucao_equipe": "Padrão: {NOME}-P_gen",
     "_exemplo": "PV-0.PV_0-P_gen ou Usina_Solar-P_gen",
-    "regex": "(.+?)-P_gen",
+    "regex": "(.+?)-[pP]_gen",
     "prefixo": "P",
     "tem_fase": false
   },
   "Potência Ativa da Rede (MW)": {
     "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-P_MW",
     "_exemplo": "Grid-0.0-LV2.101 Bus 19-P_MW ou LV2.101 Bus 19-P_MW",
-    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-P_MW",
+    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-[pP]_MW",
     "prefixo": "P",
     "tem_fase": false
   },
-  "Potência Reativa da Rede (MVAr)": {
-    "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-Q_MVar",
-    "_exemplo": "Grid-0.0-LV2.101 Bus 28-q_MVar ou LV2.101 Bus 28-Q_MVar",
-    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-Q_MVar",
+  "Potência Reativa da Rede (Mvar)": {
+    "_instrucao_equipe": "Prefixo Grid opcional. Padrão: (Grid-{ID}-){NOME}-Q_Mvar",
+    "_exemplo": "Grid-0.0-LV2.101 Bus 28-q_Mvar ou LV2.101 Bus 28-Q_Mvar",
+    "regex": "(?:Grid-[\\w.-]+-)?(.+?)-[qQ]_Mvar",
     "prefixo": "Q",
     "tem_fase": false
   },
